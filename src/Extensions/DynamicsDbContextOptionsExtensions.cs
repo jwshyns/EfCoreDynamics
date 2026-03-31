@@ -1,97 +1,47 @@
-using System;
 using EfCore.Dynamics365.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
-namespace EfCore.Dynamics365
+namespace EfCore.Dynamics365.Extensions;
+
+/// <summary>
+/// Extension methods on <see cref="DbContextOptionsBuilder"/> for configuring
+/// the Dynamics 365 / Dataverse EF Core provider.
+///
+/// <para>
+/// After calling <c>UseDynamics365</c>, register your <c>IOrganizationService</c>
+/// implementation in the DI container:
+/// <code>
+///   services.AddScoped&lt;IOrganizationService&gt;(_ => new ServiceClient(connectionString));
+/// </code>
+/// </para>
+/// </summary>
+public static class DynamicsDbContextOptionsExtensions
 {
     /// <summary>
-    /// Extension methods on <see cref="DbContextOptionsBuilder"/> for configuring
-    /// the Dynamics 365 / Dataverse EF Core provider.
+    /// Configures EF Core to use Dynamics 365 / Dataverse via <c>IOrganizationService</c>.
     /// </summary>
-    public static class DynamicsDbContextOptionsExtensions
+    /// <param name="optionsBuilder">The options builder.</param>
+    /// <param name="serviceUrl">
+    ///   The Dataverse environment URL (used for logging/display only),
+    ///   e.g. <c>https://yourorg.api.crm.dynamics.com</c>.
+    /// </param>
+    public static DbContextOptionsBuilder UseDynamics365(
+        this DbContextOptionsBuilder optionsBuilder,
+        string serviceUrl
+    )
     {
-        // ── Client-credentials (recommended for server-side) ──────────────────
+        var ext = new DynamicsOptionsExtension().WithServiceUrl(serviceUrl);
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(ext);
+        return optionsBuilder;
+    }
 
-        /// <summary>
-        /// Configures EF Core to use Dynamics 365 / Dataverse with
-        /// OAuth2 client-credentials (app registration).
-        /// </summary>
-        /// <param name="optionsBuilder">The options builder.</param>
-        /// <param name="serviceUrl">
-        ///   The Dataverse environment URL,
-        ///   e.g. <c>https://yourorg.api.crm.dynamics.com</c>.
-        /// </param>
-        /// <param name="tenantId">Azure AD tenant GUID or domain.</param>
-        /// <param name="clientId">Azure AD application (client) ID.</param>
-        /// <param name="clientSecret">Client secret for the app registration.</param>
-        /// <param name="optionsAction">Optional builder for additional options.</param>
-        public static DbContextOptionsBuilder UseDynamics365(
-            this DbContextOptionsBuilder optionsBuilder,
-            string serviceUrl,
-            string tenantId,
-            string clientId,
-            string clientSecret,
-            Action<DynamicsDbOptionsBuilder>? optionsAction = null)
-        {
-            var ext = new DynamicsOptionsExtension()
-                .WithServiceUrl(serviceUrl)
-                .WithTenantId(tenantId)
-                .WithClientId(clientId)
-                .WithClientSecret(clientSecret);
-
-            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(ext);
-
-            optionsAction?.Invoke(new DynamicsDbOptionsBuilder(optionsBuilder));
-            return optionsBuilder;
-        }
-
-        /// <summary>
-        /// Configures EF Core to use Dynamics 365 / Dataverse with username+password
-        /// (ROPC flow). Only use for non-MFA accounts and development/testing scenarios.
-        /// </summary>
-        public static DbContextOptionsBuilder UseDynamics365WithPassword(
-            this DbContextOptionsBuilder optionsBuilder,
-            string serviceUrl,
-            string tenantId,
-            string clientId,
-            string username,
-            string password,
-            Action<DynamicsDbOptionsBuilder>? optionsAction = null)
-        {
-            var ext = new DynamicsOptionsExtension()
-                .WithServiceUrl(serviceUrl)
-                .WithTenantId(tenantId)
-                .WithClientId(clientId)
-                .WithUsername(username)
-                .WithPassword(password);
-
-            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(ext);
-
-            optionsAction?.Invoke(new DynamicsDbOptionsBuilder(optionsBuilder));
-            return optionsBuilder;
-        }
-
-        // ── Generic overload ──────────────────────────────────────────────────
-
-        /// <summary>
-        /// Configures EF Core to use Dynamics 365 / Dataverse with client credentials
-        /// (generic <see cref="DbContextOptionsBuilder{TContext}"/> overload).
-        /// </summary>
-        public static DbContextOptionsBuilder<TContext> UseDynamics365<TContext>(
-            this DbContextOptionsBuilder<TContext> optionsBuilder,
-            string serviceUrl,
-            string tenantId,
-            string clientId,
-            string clientSecret,
-            Action<DynamicsDbOptionsBuilder>? optionsAction = null)
-            where TContext : DbContext
-        {
-            return (DbContextOptionsBuilder<TContext>)
-                UseDynamics365(
-                    (DbContextOptionsBuilder)optionsBuilder,
-                    serviceUrl, tenantId, clientId, clientSecret,
-                    optionsAction);
-        }
+    /// <summary>Generic <see cref="DbContextOptionsBuilder{TContext}"/> overload.</summary>
+    public static DbContextOptionsBuilder<TContext> UseDynamics365<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder,
+        string serviceUrl
+    ) where TContext : DbContext
+    {
+        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(serviceUrl);
     }
 }

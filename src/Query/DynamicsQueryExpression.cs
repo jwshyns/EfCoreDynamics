@@ -1,108 +1,84 @@
 using System;
-using System.Collections.Generic;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Xrm.Sdk.Query;
 
-namespace EfCore.Dynamics365.Query
+namespace EfCore.Dynamics365.Query;
+
+/// <summary>
+/// Intermediate representation of a Dataverse query accumulated during
+/// EF Core LINQ translation. Wraps <see cref="QueryExpression"/> from the
+/// CRM SDK and exposes mutation helpers called by the translation visitors.
+/// </summary>
+public sealed class DynamicsQueryExpression : Expression
 {
-    /// <summary>
-    /// Intermediate representation of an OData query built up during
-    /// EF Core LINQ translation. Equivalent to SQL SelectExpression in relational providers.
-    /// </summary>
-    public sealed class DynamicsQueryExpression : Expression
+    private readonly QueryExpression _sdkQuery;
+
+    public IEntityType EntityType { get; }
+
+    /// <summary>Dataverse entity logical name, e.g. "account".</summary>
+    public string EntityLogicalName { get; }
+
+    /// <summary>Whether First/Single semantics apply (forces TopCount = 1).</summary>
+    public bool IsSingleRow { get; private set; }
+
+    /// <summary>In-memory skip value (QueryExpression has no native offset).</summary>
+    public int? Skip { get; private set; }
+
+    // EF Core expression infrastructure
+    public override ExpressionType NodeType => ExpressionType.Extension;
+    public override Type Type { get; }
+
+    public DynamicsQueryExpression(IEntityType entityType, string entityLogicalName)
     {
-        private readonly List<string> _selectFields = new List<string>();
-        private readonly List<string> _orderByClauses = new List<string>();
-        private readonly List<string> _filterClauses = new List<string>();
+        EntityType        = entityType;
+        EntityLogicalName = entityLogicalName;
+        Type              = typeof(object);
 
-        public IEntityType EntityType { get; }
-
-        /// <summary>The OData entity-set name used in the URL, e.g. "accounts".</summary>
-        public string EntitySetName { get; }
-
-        /// <summary>Fields for $select (empty = all fields).</summary>
-        public IReadOnlyList<string> SelectFields => _selectFields;
-
-        /// <summary>OData $filter string segments (joined with " and ").</summary>
-        public IReadOnlyList<string> FilterClauses => _filterClauses;
-
-        /// <summary>OData $orderby segments.</summary>
-        public IReadOnlyList<string> OrderByClauses => _orderByClauses;
-
-        /// <summary>OData $top value; null means no limit.</summary>
-        public int? Top { get; private set; }
-
-        /// <summary>OData $skip value; null means no skip.</summary>
-        public int? Skip { get; private set; }
-
-        /// <summary>Whether First/Single semantics apply (forces Top=1).</summary>
-        public bool IsSingleRow { get; private set; }
-
-        // EF Core expression infrastructure
-        public override ExpressionType NodeType => ExpressionType.Extension;
-        public override Type Type { get; }
-
-        public DynamicsQueryExpression(IEntityType entityType, string entitySetName)
+        _sdkQuery = new QueryExpression(entityLogicalName)
         {
-            EntityType    = entityType;
-            EntitySetName = entitySetName;
-            Type          = typeof(object); // overridden by shaper
-        }
-
-        // ── Mutation helpers (called by visitor) ──────────────────────────────
-
-        public void AddFilter(string odataFilter)
-        {
-            if (!string.IsNullOrWhiteSpace(odataFilter))
-                _filterClauses.Add("(" + odataFilter + ")");
-        }
-
-        public void AddSelectField(string logicalName)
-        {
-            if (!_selectFields.Contains(logicalName))
-                _selectFields.Add(logicalName);
-        }
-
-        public void AddOrderBy(string clause) => _orderByClauses.Add(clause);
-
-        public void SetTop(int top)
-        {
-            Top = Top.HasValue ? Math.Min(Top.Value, top) : top;
-        }
-
-        public void SetSkip(int skip) => Skip = skip;
-
-        public void SetSingleRow() { IsSingleRow = true; SetTop(1); }
-
-        // ── OData URL building ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// Serialises the query into a URL query string (the part after '?').
-        /// </summary>
-        public string BuildODataQueryString()
-        {
-            var parts = new List<string>();
-
-            if (_filterClauses.Count > 0)
-                parts.Add("$filter=" + Uri.EscapeDataString(
-                    string.Join(" and ", _filterClauses)));
-
-            if (_selectFields.Count > 0)
-                parts.Add("$select=" + string.Join(",", _selectFields));
-
-            if (_orderByClauses.Count > 0)
-                parts.Add("$orderby=" + Uri.EscapeDataString(
-                    string.Join(",", _orderByClauses)));
-
-            if (Top.HasValue)
-                parts.Add("$top=" + Top.Value);
-
-            if (Skip.HasValue)
-                parts.Add("$skip=" + Skip.Value);
-
-            return string.Join("&", parts);
-        }
-
-        protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
+            ColumnSet = new ColumnSet(true), // all columns unless AddSelectField is called
+        };
     }
+
+    // ── Mutation helpers (called by translation visitors) ──────────────────
+
+    public void AddFilter(FilterExpression filter)
+    {
+        _sdkQuery.Criteria.AddFilter(filter);
+    }
+
+    public void AddSelectField(string logicalName)
+    {
+        if (_sdkQuery.ColumnSet.AllColumns)
+            _sdkQuery.ColumnSet = new ColumnSet();
+
+        if (!_sdkQuery.ColumnSet.Columns.Contains(logicalName))
+            _sdkQuery.ColumnSet.AddColumn(logicalName);
+    }
+
+    public void AddOrderBy(string logicalName, bool ascending)
+    {
+        _sdkQuery.Orders.Add(new OrderExpression(
+            logicalName,
+            ascending ? OrderType.Ascending : OrderType.Descending));
+    }
+
+    public void SetTop(int top)
+    {
+        _sdkQuery.TopCount = _sdkQuery.TopCount.HasValue
+            ? Math.Min(_sdkQuery.TopCount.Value, top)
+            : top;
+    }
+
+    public void SetSkip(int skip) => Skip = skip;
+
+    public void SetSingleRow() { IsSingleRow = true; SetTop(1); }
+
+    // ── SDK query access ──────────────────────────────────────────────────
+
+    /// <summary>Returns the fully-built <see cref="QueryExpression"/> ready to send to Dataverse.</summary>
+    public QueryExpression BuildQueryExpression() => _sdkQuery;
+
+    protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
 }

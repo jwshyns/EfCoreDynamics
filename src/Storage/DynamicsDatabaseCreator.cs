@@ -1,48 +1,109 @@
 using System.Threading;
 using System.Threading.Tasks;
-using EfCore.Dynamics365.Client;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace EfCore.Dynamics365.Storage
+namespace EfCore.Dynamics365.Storage;
+
+/// <summary>
+/// Dataverse does not require schema creation — this implementation
+/// is a no-op that always reports the "database" as existing.
+/// </summary>
+public sealed class DynamicsDatabaseCreator : IRelationalDatabaseCreator
 {
     /// <summary>
-    /// Dataverse does not require schema creation — this implementation
-    /// is a no-op that always reports the "database" as existing.
+    /// Dataverse environments cannot be created via the Web API.
+    /// This method always returns <c>false</c>.
     /// </summary>
-    public sealed class DynamicsDatabaseCreator : IDatabaseCreator
+    public bool EnsureCreated()
     {
-        private readonly DynamicsHttpClient _client;
+        throw new System.NotImplementedException();
+    }
 
-        public DynamicsDatabaseCreator(DynamicsHttpClient client)
-        {
-            _client = client;
-        }
+    public Task<bool> EnsureCreatedAsync(CancellationToken cancellationToken = default)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        /// <summary>
-        /// Dataverse environments cannot be created via the Web API.
-        /// This method always returns <c>false</c>.
-        /// </summary>
-        public bool EnsureCreated() => false;
+    /// <summary>
+    /// Dataverse environments cannot be deleted via the Web API.
+    /// This method always returns <c>false</c>.
+    /// </summary>
+    public bool EnsureDeleted()
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public Task<bool> EnsureCreatedAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(false);
+    public Task<bool> EnsureDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        /// <summary>
-        /// Dataverse environments cannot be deleted via the Web API.
-        /// This method always returns <c>false</c>.
-        /// </summary>
-        public bool EnsureDeleted() => false;
+    /// <summary>
+    /// Returns <c>true</c> — the Dataverse environment is presumed to exist
+    /// if a valid ServiceUrl is configured.
+    /// </summary>
+    public bool CanConnect()
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public Task<bool> EnsureDeletedAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(false);
+    public Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        /// <summary>
-        /// Returns <c>true</c> — the Dataverse environment is presumed to exist
-        /// if a valid ServiceUrl is configured.
-        /// </summary>
-        public bool CanConnect() => true;
+    public bool Exists()
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(true);
+    public Task<bool> ExistsAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public bool HasTables()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public Task<bool> HasTablesAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void Create()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public Task CreateAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void Delete()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public Task DeleteAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void CreateTables()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public Task CreateTablesAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public string GenerateCreateScript()
+    {
+        throw new System.NotImplementedException();
     }
 }
