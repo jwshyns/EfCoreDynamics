@@ -282,13 +282,10 @@ internal sealed class CrmFilterExpressionVisitor
         return prop?.GetAttributeLogicalName() ?? clrPropertyName.ToLowerInvariant();
     }
 
-    private bool IsMemberOnParameter(Expression expr) =>
+    private static bool IsMemberOnParameter(Expression expr) =>
         expr is MemberExpression m
-        && (IsEntityParameter(m.Expression)
-            || (m.Expression is UnaryExpression u && IsEntityParameter(u.Operand)));
-
-    private bool IsEntityParameter(Expression? expr) =>
-        expr is ParameterExpression p && p.Type == _entityType.ClrType;
+        && (m.Expression is ParameterExpression
+            || (m.Expression is UnaryExpression u && u.Operand is ParameterExpression));
 
     private static string? MemberName(Expression? expr) => expr switch
     {
