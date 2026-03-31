@@ -21,7 +21,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     public DynamicsQueryableMethodTranslatingExpressionVisitor(
         QueryableMethodTranslatingExpressionVisitorDependencies dependencies,
-        IModel model)
+        IModel model
+    )
         : base(dependencies, subquery: false)
     {
         _dependencies = dependencies;
@@ -31,7 +32,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     private DynamicsQueryableMethodTranslatingExpressionVisitor(
         QueryableMethodTranslatingExpressionVisitorDependencies dependencies,
         IModel model,
-        bool subquery)
+        bool subquery
+    )
         : base(dependencies, subquery)
     {
         _dependencies = dependencies;
@@ -66,7 +68,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     protected override ShapedQueryExpression TranslateWhere(
         ShapedQueryExpression source,
-        LambdaExpression predicate)
+        LambdaExpression predicate
+    )
     {
         var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
         var visitor = new CrmFilterExpressionVisitor(dynQuery.EntityType, predicate.Parameters[0]);
@@ -80,7 +83,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     protected override ShapedQueryExpression TranslateOrderBy(
         ShapedQueryExpression source,
         LambdaExpression keySelector,
-        bool ascending)
+        bool ascending
+    )
     {
         ApplyOrderBy(source, keySelector, ascending);
         return source;
@@ -89,7 +93,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     protected override ShapedQueryExpression TranslateThenBy(
         ShapedQueryExpression source,
         LambdaExpression keySelector,
-        bool ascending)
+        bool ascending
+    )
     {
         ApplyOrderBy(source, keySelector, ascending);
         return source;
@@ -98,7 +103,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     private static void ApplyOrderBy(
         ShapedQueryExpression source,
         LambdaExpression keySelector,
-        bool ascending)
+        bool ascending
+    )
     {
         if (keySelector.Body is not MemberExpression m) return;
 
@@ -112,19 +118,23 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     protected override ShapedQueryExpression TranslateTake(
         ShapedQueryExpression source,
-        Expression count)
+        Expression count
+    )
     {
-        if (count is ConstantExpression { Value: int top })
-            ((DynamicsQueryExpression)source.QueryExpression).SetTop(top);
+        ApplyCountParam(count, (DynamicsQueryExpression)source.QueryExpression,
+            setConstant: (d, v) => d.SetTop(v),
+            setParam:    (d, n) => d.SetTopParameterName(n));
         return source;
     }
 
     protected override ShapedQueryExpression TranslateSkip(
         ShapedQueryExpression source,
-        Expression count)
+        Expression count
+    )
     {
-        if (count is ConstantExpression { Value: int skip })
-            ((DynamicsQueryExpression)source.QueryExpression).SetSkip(skip);
+        ApplyCountParam(count, (DynamicsQueryExpression)source.QueryExpression,
+            setConstant: (d, v) => d.SetSkip(v),
+            setParam:    (d, n) => d.SetSkipParameterName(n));
         return source;
     }
 
@@ -134,7 +144,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         ShapedQueryExpression source,
         LambdaExpression predicate,
         Type returnType,
-        bool returnDefault)
+        bool returnDefault
+    )
     {
         if (predicate != null)
             source = TranslateWhere(source, predicate);
@@ -146,14 +157,16 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         ShapedQueryExpression source,
         LambdaExpression predicate,
         Type returnType,
-        bool returnDefault)
+        bool returnDefault
+    )
         => TranslateFirstOrDefault(source, predicate, returnType, returnDefault);
 
     // ── Count / LongCount ─────────────────────────────────────────────────
 
     protected override ShapedQueryExpression TranslateCount(
         ShapedQueryExpression source,
-        LambdaExpression predicate)
+        LambdaExpression predicate
+    )
     {
         if (predicate != null) TranslateWhere(source, predicate);
         return source;
@@ -161,7 +174,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     protected override ShapedQueryExpression TranslateLongCount(
         ShapedQueryExpression source,
-        LambdaExpression predicate)
+        LambdaExpression predicate
+    )
         => TranslateCount(source, predicate);
 
     // ── Unsupported ───────────────────────────────────────────────────────
@@ -172,8 +186,11 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     protected override ShapedQueryExpression TranslateAny(ShapedQueryExpression source, LambdaExpression predicate) =>
         null!;
 
-    protected override ShapedQueryExpression TranslateAverage(ShapedQueryExpression source, LambdaExpression selector,
-        Type resultType) => null!;
+    protected override ShapedQueryExpression TranslateAverage(
+        ShapedQueryExpression source,
+        LambdaExpression selector,
+        Type resultType
+    ) => null!;
 
     protected override ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType) => null!;
 
@@ -182,41 +199,76 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     protected override ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item) => null!;
 
-    protected override ShapedQueryExpression TranslateDefaultIfEmpty(ShapedQueryExpression source,
-        Expression defaultValue) => null!;
+    protected override ShapedQueryExpression TranslateDefaultIfEmpty(
+        ShapedQueryExpression source,
+        Expression defaultValue
+    ) => null!;
 
     protected override ShapedQueryExpression TranslateDistinct(ShapedQueryExpression source) => null!;
 
-    protected override ShapedQueryExpression TranslateElementAtOrDefault(ShapedQueryExpression source, Expression index,
-        bool returnDefault) => null!;
+    protected override ShapedQueryExpression TranslateElementAtOrDefault(
+        ShapedQueryExpression source,
+        Expression index,
+        bool returnDefault
+    ) => null!;
 
     protected override ShapedQueryExpression
         TranslateExcept(ShapedQueryExpression source, ShapedQueryExpression second) => null!;
 
-    protected override ShapedQueryExpression TranslateGroupBy(ShapedQueryExpression source,
-        LambdaExpression keySelector, LambdaExpression elementSelector, LambdaExpression resultSelector) => null!;
+    protected override ShapedQueryExpression TranslateGroupBy(
+        ShapedQueryExpression source,
+        LambdaExpression keySelector,
+        LambdaExpression elementSelector,
+        LambdaExpression resultSelector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateGroupJoin(ShapedQueryExpression outer,
-        ShapedQueryExpression inner, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector,
-        LambdaExpression resultSelector) => null!;
+    protected override ShapedQueryExpression TranslateGroupJoin(
+        ShapedQueryExpression outer,
+        ShapedQueryExpression inner,
+        LambdaExpression outerKeySelector,
+        LambdaExpression innerKeySelector,
+        LambdaExpression resultSelector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateIntersect(ShapedQueryExpression source,
-        ShapedQueryExpression second) => null!;
+    protected override ShapedQueryExpression TranslateIntersect(
+        ShapedQueryExpression source,
+        ShapedQueryExpression second
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateJoin(ShapedQueryExpression outer, ShapedQueryExpression inner,
-        LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector) => null!;
+    protected override ShapedQueryExpression TranslateJoin(
+        ShapedQueryExpression outer,
+        ShapedQueryExpression inner,
+        LambdaExpression outerKeySelector,
+        LambdaExpression innerKeySelector,
+        LambdaExpression resultSelector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateLastOrDefault(ShapedQueryExpression source,
-        LambdaExpression predicate, Type returnType, bool returnDefault) => null!;
+    protected override ShapedQueryExpression TranslateLastOrDefault(
+        ShapedQueryExpression source,
+        LambdaExpression predicate,
+        Type returnType,
+        bool returnDefault
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateLeftJoin(ShapedQueryExpression outer, ShapedQueryExpression inner,
-        LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector) => null!;
+    protected override ShapedQueryExpression TranslateLeftJoin(
+        ShapedQueryExpression outer,
+        ShapedQueryExpression inner,
+        LambdaExpression outerKeySelector,
+        LambdaExpression innerKeySelector,
+        LambdaExpression resultSelector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateMax(ShapedQueryExpression source, LambdaExpression selector,
-        Type resultType) => null!;
+    protected override ShapedQueryExpression TranslateMax(
+        ShapedQueryExpression source,
+        LambdaExpression selector,
+        Type resultType
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateMin(ShapedQueryExpression source, LambdaExpression selector,
-        Type resultType) => null!;
+    protected override ShapedQueryExpression TranslateMin(
+        ShapedQueryExpression source,
+        LambdaExpression selector,
+        Type resultType
+    ) => null!;
 
     protected override ShapedQueryExpression TranslateOfType(ShapedQueryExpression source, Type resultType) => null!;
     protected override ShapedQueryExpression TranslateReverse(ShapedQueryExpression source) => null!;
@@ -224,37 +276,47 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     protected override ShapedQueryExpression TranslateSelect(ShapedQueryExpression source, LambdaExpression selector) =>
         source;
 
-    protected override ShapedQueryExpression TranslateSelectMany(ShapedQueryExpression source,
-        LambdaExpression collectionSelector, LambdaExpression resultSelector) => null!;
+    protected override ShapedQueryExpression TranslateSelectMany(
+        ShapedQueryExpression source,
+        LambdaExpression collectionSelector,
+        LambdaExpression resultSelector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateSelectMany(ShapedQueryExpression source,
-        LambdaExpression selector) => null!;
+    protected override ShapedQueryExpression TranslateSelectMany(
+        ShapedQueryExpression source,
+        LambdaExpression selector
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateSkipWhile(ShapedQueryExpression source,
-        LambdaExpression predicate) => null!;
+    protected override ShapedQueryExpression TranslateSkipWhile(
+        ShapedQueryExpression source,
+        LambdaExpression predicate
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateSum(ShapedQueryExpression source, LambdaExpression selector,
-        Type resultType) => null!;
+    protected override ShapedQueryExpression TranslateSum(
+        ShapedQueryExpression source,
+        LambdaExpression selector,
+        Type resultType
+    ) => null!;
 
-    protected override ShapedQueryExpression TranslateTakeWhile(ShapedQueryExpression source,
-        LambdaExpression predicate) => null!;
+    protected override ShapedQueryExpression TranslateTakeWhile(
+        ShapedQueryExpression source,
+        LambdaExpression predicate
+    ) => null!;
 
     protected override ShapedQueryExpression
         TranslateUnion(ShapedQueryExpression source, ShapedQueryExpression second) => null!;
-}
 
-/// <inheritdoc />
-public sealed class DynamicsQueryableMethodTranslatingExpressionVisitorFactory
-    : IQueryableMethodTranslatingExpressionVisitorFactory
-{
-    private readonly QueryableMethodTranslatingExpressionVisitorDependencies _dependencies;
+    // ── Helpers ───────────────────────────────────────────────────────────
 
-    public DynamicsQueryableMethodTranslatingExpressionVisitorFactory(
-        QueryableMethodTranslatingExpressionVisitorDependencies dependencies)
+    private static void ApplyCountParam(
+        Expression count,
+        DynamicsQueryExpression dynExpr,
+        Action<DynamicsQueryExpression, int> setConstant,
+        Action<DynamicsQueryExpression, string> setParam)
     {
-        _dependencies = dependencies;
+        if (count is ConstantExpression { Value: int value })
+            setConstant(dynExpr, value);
+        else if (count is ParameterExpression { Name: { } name })
+            setParam(dynExpr, name);
     }
-
-    public QueryableMethodTranslatingExpressionVisitor Create(IModel model)
-        => new DynamicsQueryableMethodTranslatingExpressionVisitor(_dependencies, model);
 }

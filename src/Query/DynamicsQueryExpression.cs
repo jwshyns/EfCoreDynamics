@@ -25,15 +25,21 @@ public sealed class DynamicsQueryExpression : Expression
     /// <summary>In-memory skip value (QueryExpression has no native offset).</summary>
     public int? Skip { get; private set; }
 
+    /// <summary>Name of the QueryContext parameter holding the skip value, when Skip is not a compile-time constant.</summary>
+    public string? SkipParameterName { get; private set; }
+
+    /// <summary>Name of the QueryContext parameter holding the top/take value, when it is not a compile-time constant.</summary>
+    public string? TopParameterName { get; private set; }
+
     // EF Core expression infrastructure
     public override ExpressionType NodeType => ExpressionType.Extension;
     public override Type Type { get; }
 
     public DynamicsQueryExpression(IEntityType entityType, string entityLogicalName)
     {
-        EntityType        = entityType;
+        EntityType = entityType;
         EntityLogicalName = entityLogicalName;
-        Type              = typeof(object);
+        Type = typeof(object);
 
         _sdkQuery = new QueryExpression(entityLogicalName)
         {
@@ -72,8 +78,14 @@ public sealed class DynamicsQueryExpression : Expression
     }
 
     public void SetSkip(int skip) => Skip = skip;
+    public void SetSkipParameterName(string name) => SkipParameterName = name;
+    public void SetTopParameterName(string name) => TopParameterName = name;
 
-    public void SetSingleRow() { IsSingleRow = true; SetTop(1); }
+    public void SetSingleRow()
+    {
+        IsSingleRow = true;
+        SetTop(1);
+    }
 
     // ── SDK query access ──────────────────────────────────────────────────
 

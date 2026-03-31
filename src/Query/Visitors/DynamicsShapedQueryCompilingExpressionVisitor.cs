@@ -22,20 +22,20 @@ public sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryC
 
     public DynamicsShapedQueryCompilingExpressionVisitor(
         ShapedQueryCompilingExpressionVisitorDependencies dependencies,
-        QueryCompilationContext queryCompilationContext)
+        QueryCompilationContext queryCompilationContext
+    )
         : base(dependencies, queryCompilationContext)
     {
         _isAsync = queryCompilationContext.IsAsync;
     }
 
-    protected override Expression VisitShapedQueryExpression(
-        ShapedQueryExpression shapedQueryExpression)
+    protected override Expression VisitShapedQueryExpression(ShapedQueryExpression shapedQueryExpression)
     {
         var dynExpr = (DynamicsQueryExpression)shapedQueryExpression.QueryExpression;
         var entityType = dynExpr.EntityType;
         var clrType = entityType.ClrType;
 
-        var queryContextParam = Expression.Parameter(typeof(QueryContext), "queryContext");
+        var queryContextParam = QueryCompilationContext.QueryContextParameter;
         var dynQueryConst = Expression.Constant(dynExpr);
         var entityTypeConst = Expression.Constant(entityType);
 
@@ -45,16 +45,13 @@ public sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryC
                 .GetMethod(nameof(DynamicsQueryExecutor.ExecuteAsync))!
                 .MakeGenericMethod(clrType);
 
-            return Expression.Lambda(
-                Expression.Call(
-                    null,
-                    method,
-                    queryContextParam,
-                    dynQueryConst,
-                    entityTypeConst,
-                    Expression.Constant(CancellationToken.None)
-                ),
-                queryContextParam
+            return Expression.Call(
+                null,
+                method,
+                queryContextParam,
+                dynQueryConst,
+                entityTypeConst,
+                Expression.Constant(CancellationToken.None)
             );
         }
         else
@@ -63,10 +60,7 @@ public sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryC
                 .GetMethod(nameof(DynamicsQueryExecutor.Execute))!
                 .MakeGenericMethod(clrType);
 
-            return Expression.Lambda(
-                Expression.Call(null, method, queryContextParam, dynQueryConst, entityTypeConst),
-                queryContextParam
-            );
+            return Expression.Call(null, method, queryContextParam, dynQueryConst, entityTypeConst);
         }
     }
 }
@@ -80,7 +74,8 @@ public static class DynamicsQueryExecutor
     public static IEnumerable<T> Execute<T>(
         QueryContext queryContext,
         DynamicsQueryExpression query,
-        IEntityType entityType)
+        IEntityType entityType
+    )
         where T : class
     {
         var ctx = (DynamicsQueryContext)queryContext;
@@ -89,8 +84,10 @@ public static class DynamicsQueryExecutor
             .QueryAsync(query.EntityLogicalName, sdkQuery)
             .GetAwaiter().GetResult();
 
-        if (query.Skip.HasValue)
-            rows = rows.Skip(query.Skip.Value);
+        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
+            rows = rows.Skip(skip);
+        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
+            rows = rows.Take(top);
 
         return rows.Select(e => Materialise<T>(e, entityType));
     }
@@ -99,7 +96,8 @@ public static class DynamicsQueryExecutor
         QueryContext queryContext,
         DynamicsQueryExpression query,
         IEntityType entityType,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
         where T : class
     {
         var ctx = (DynamicsQueryContext)queryContext;
@@ -109,8 +107,10 @@ public static class DynamicsQueryExecutor
             .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)
             .ConfigureAwait(false);
 
-        if (query.Skip.HasValue)
-            rows = rows.Skip(query.Skip.Value);
+        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
+            rows = rows.Skip(skip);
+        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
+            rows = rows.Take(top);
 
         foreach (var e in rows)
             yield return Materialise<T>(e, entityType);
@@ -178,20 +178,7 @@ public static class DynamicsQueryExecutor
 
         return rawValue is IConvertible ? Convert.ChangeType(rawValue, underlying) : rawValue;
     }
-}
 
-/// <inheritdoc />
-public sealed class DynamicsShapedQueryCompilingExpressionVisitorFactory
-    : IShapedQueryCompilingExpressionVisitorFactory
-{
-    private readonly ShapedQueryCompilingExpressionVisitorDependencies _dependencies;
-
-    public DynamicsShapedQueryCompilingExpressionVisitorFactory(
-        ShapedQueryCompilingExpressionVisitorDependencies dependencies)
-    {
-        _dependencies = dependencies;
-    }
-
-    public ShapedQueryCompilingExpressionVisitor Create(QueryCompilationContext queryCompilationContext)
-        => new DynamicsShapedQueryCompilingExpressionVisitor(_dependencies, queryCompilationContext);
+    private static int? ResolveCount(int? constant, string? paramName, QueryContext ctx)
+        => constant ?? (paramName is { } n ? (int?)ctx.ParameterValues[n] : null);
 }

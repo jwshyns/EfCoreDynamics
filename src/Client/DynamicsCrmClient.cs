@@ -28,7 +28,8 @@ public sealed class DynamicsCrmClient
     public async Task<IList<Entity>> QueryAsync(
         string logicalName,
         QueryExpression query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         query.EntityName = logicalName;
         var results = new List<Entity>();
@@ -51,8 +52,8 @@ public sealed class DynamicsCrmClient
         {
             query.PageInfo = new PagingInfo
             {
-                Count        = 5000,
-                PageNumber   = pageNumber,
+                Count = 5000,
+                PageNumber = pageNumber,
                 PagingCookie = pagingCookie,
             };
 
