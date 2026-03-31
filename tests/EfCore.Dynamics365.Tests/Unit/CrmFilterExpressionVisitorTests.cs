@@ -261,7 +261,7 @@ public class CrmFilterExpressionVisitorTests
         var (visitor, param) = CreateVisitor();
         var expr = Expression.Call(
             Expression.Property(param, nameof(Account.Name)),
-            typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
+            typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!,
             Expression.Constant("corp"));
 
         var filter = visitor.Translate(expr);
@@ -277,7 +277,7 @@ public class CrmFilterExpressionVisitorTests
         var (visitor, param) = CreateVisitor();
         var expr = Expression.Call(
             Expression.Property(param, nameof(Account.Name)),
-            typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!,
+            typeof(string).GetMethod(nameof(string.StartsWith), [typeof(string)])!,
             Expression.Constant("Ac"));
 
         var filter = visitor.Translate(expr);
@@ -292,7 +292,7 @@ public class CrmFilterExpressionVisitorTests
         var (visitor, param) = CreateVisitor();
         var expr = Expression.Call(
             Expression.Property(param, nameof(Account.Name)),
-            typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!,
+            typeof(string).GetMethod(nameof(string.EndsWith), [typeof(string)])!,
             Expression.Constant("Inc"));
 
         var filter = visitor.Translate(expr);
@@ -348,7 +348,7 @@ public class CrmFilterExpressionVisitorTests
     public void Evaluates_captured_closure_variable()
     {
         var (visitor, param) = CreateVisitor();
-        string capturedName = "Closure Corp";
+        const string capturedName = "Closure Corp";
         // Build expression that refers to capturedName via a captured variable
         Expression<Func<Account, bool>> lambda = a => a.Name == capturedName;
         var binaryExpr = (BinaryExpression)lambda.Body;

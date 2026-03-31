@@ -22,16 +22,16 @@ public static class DynamicsDbContextOptionsExtensions
     /// Configures EF Core to use Dynamics 365 / Dataverse via <c>IOrganizationService</c>.
     /// </summary>
     /// <param name="optionsBuilder">The options builder.</param>
-    /// <param name="serviceUrl">
+    /// <param name="connectionString">
     ///   The Dataverse environment URL (used for logging/display only),
     ///   e.g. <c>https://yourorg.api.crm.dynamics.com</c>.
     /// </param>
     public static DbContextOptionsBuilder UseDynamics365(
         this DbContextOptionsBuilder optionsBuilder,
-        string serviceUrl
+        string connectionString
     )
     {
-        var ext = new DynamicsOptionsExtension().WithServiceUrl(serviceUrl);
+        var ext = new DynamicsOptionsExtension().WithConnectionString(connectionString);
         ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(ext);
         return optionsBuilder;
     }
@@ -39,9 +39,9 @@ public static class DynamicsDbContextOptionsExtensions
     /// <summary>Generic <see cref="DbContextOptionsBuilder{TContext}"/> overload.</summary>
     public static DbContextOptionsBuilder<TContext> UseDynamics365<TContext>(
         this DbContextOptionsBuilder<TContext> optionsBuilder,
-        string serviceUrl
+        string connectionString
     ) where TContext : DbContext
     {
-        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(serviceUrl);
+        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(connectionString);
     }
 }

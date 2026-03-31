@@ -10,21 +10,8 @@ public sealed class DynamicsQueryTranslationPreprocessor : QueryTranslationPrepr
 {
     public DynamicsQueryTranslationPreprocessor(
         QueryTranslationPreprocessorDependencies dependencies,
-        QueryCompilationContext queryCompilationContext)
-        : base(dependencies, queryCompilationContext) { }
-}
-
-public sealed class DynamicsQueryTranslationPreprocessorFactory
-    : IQueryTranslationPreprocessorFactory
-{
-    private readonly QueryTranslationPreprocessorDependencies _dependencies;
-
-    public DynamicsQueryTranslationPreprocessorFactory(
-        QueryTranslationPreprocessorDependencies dependencies)
+        QueryCompilationContext queryCompilationContext
+    ) : base(dependencies, queryCompilationContext)
     {
-        _dependencies = dependencies;
     }
-
-    public QueryTranslationPreprocessor Create(QueryCompilationContext queryCompilationContext)
-        => new DynamicsQueryTranslationPreprocessor(_dependencies, queryCompilationContext);
 }

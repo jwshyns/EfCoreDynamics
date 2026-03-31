@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace EfCore.Dynamics365.Query;
+namespace EfCore.Dynamics365.Query.Visitors;
 
 /// <summary>
 /// Translates LINQ queryable method calls (Where, Select, Take, Skip, OrderBy, etc.)
@@ -39,8 +39,7 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     }
 
     protected override QueryableMethodTranslatingExpressionVisitor CreateSubqueryVisitor()
-        => new DynamicsQueryableMethodTranslatingExpressionVisitor(
-            _dependencies, _model, subquery: true);
+        => new DynamicsQueryableMethodTranslatingExpressionVisitor(_dependencies, _model, subquery: true);
 
     // ── Entry point ───────────────────────────────────────────────────────
 

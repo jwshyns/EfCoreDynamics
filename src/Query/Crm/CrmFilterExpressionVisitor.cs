@@ -271,8 +271,9 @@ internal sealed class CrmFilterExpressionVisitor
 
     private string FieldName(Expression expr)
     {
-        var name = MemberName(expr) ?? throw new NotSupportedException($"Cannot extract a field name from: {expr}");
-        return LogicalName(name);
+        if (MemberName(expr) is { } memberName) return LogicalName(memberName);
+        
+        throw new NotSupportedException($"Cannot extract a field name from: {expr}");
     }
 
     private string LogicalName(string clrPropertyName)
@@ -283,8 +284,11 @@ internal sealed class CrmFilterExpressionVisitor
 
     private bool IsMemberOnParameter(Expression expr) =>
         expr is MemberExpression m
-        && (m.Expression == _parameter
-            || (m.Expression is UnaryExpression u && u.Operand == _parameter));
+        && (IsEntityParameter(m.Expression)
+            || (m.Expression is UnaryExpression u && IsEntityParameter(u.Operand)));
+
+    private bool IsEntityParameter(Expression? expr) =>
+        expr is ParameterExpression p && p.Type == _entityType.ClrType;
 
     private static string? MemberName(Expression? expr) => expr switch
     {

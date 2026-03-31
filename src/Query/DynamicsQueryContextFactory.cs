@@ -7,14 +7,14 @@ namespace EfCore.Dynamics365.Query;
 public sealed class DynamicsQueryContextFactory : IQueryContextFactory
 {
     private readonly QueryContextDependencies _dependencies;
-    private readonly DynamicsCrmClient        _client;
+    private readonly DynamicsCrmClient _client;
 
     public DynamicsQueryContextFactory(
         QueryContextDependencies dependencies,
         DynamicsCrmClient client)
     {
         _dependencies = dependencies;
-        _client       = client;
+        _client = client;
     }
 
     public QueryContext Create() => new DynamicsQueryContext(_dependencies, _client);

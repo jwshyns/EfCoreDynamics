@@ -1,19 +1,16 @@
-using System.Diagnostics.CodeAnalysis;
 using EfCore.Dynamics365.Client;
 using EfCore.Dynamics365.Diagnostics;
 using EfCore.Dynamics365.Infrastructure;
+using EfCore.Dynamics365.Metadata.Conventions;
 using EfCore.Dynamics365.Query;
+using EfCore.Dynamics365.Query.Factories;
 using EfCore.Dynamics365.Storage;
-using EfCore.Dynamics365.Storage.Internal;
 using EfCore.Dynamics365.ValueGeneration;
-using EfCore.Dynamics365.ValueGeneration.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.EntityFrameworkCore.Update;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -36,40 +33,32 @@ public static class DynamicsServiceCollectionExtensions
 {
     public static IServiceCollection AddEntityFrameworkDynamics365(this IServiceCollection services)
     {
-        var builder = new EntityFrameworkRelationalServicesBuilder(services)
+        var builder = new EntityFrameworkServicesBuilder(services)
             .TryAdd<LoggingDefinitions, DynamicsLoggingDefinitions>()
             .TryAdd<IDatabaseProvider, DatabaseProvider<DynamicsOptionsExtension>>()
-            .TryAdd<IValueGeneratorCache>(p => p.GetService<IDynamicsValueGeneratorCache>())
-            .TryAdd<IRelationalTypeMappingSource, DynamicsTypeMappingSource>()
-            .TryAdd<ISqlGenerationHelper, DynamicsSqlGenerationHelper>()
-            .TryAdd<IMigrationsAnnotationProvider, DynamicsMigrationsAnnotationProvider>()
+            .TryAdd<IDatabase, DynamicsDatabase>()
+            .TryAdd<IDbContextTransactionManager, DynamicsTransactionManager>()
             .TryAdd<IModelValidator, DynamicsModelValidator>()
             .TryAdd<IProviderConventionSetBuilder, DynamicsConventionSetBuilder>()
-            .TryAdd<IUpdateSqlGenerator>(p => p.GetService<IDynamicsUpdateSqlGenerator>())
-            .TryAdd<IModificationCommandBatchFactory, DynamicsModificationCommandBatchFactory>()
             .TryAdd<IValueGeneratorSelector, DynamicsValueGeneratorSelector>()
-            .TryAdd<IRelationalConnection>(p => p.GetService<IDynamicsConnection>())
-            .TryAdd<IRelationalDatabaseCreator, DynamicsDatabaseCreator>()
-            .TryAdd<IHistoryRepository, DynamicsHistoryRepository>()
-            .TryAdd<ICompiledQueryCacheKeyGenerator, DynamicsCompiledQueryCacheKeyGenerator>()
-            .TryAdd<IExecutionStrategyFactory, DynamicsExecutionStrategyFactory>()
-            .TryAdd<ISingletonOptions, IDynamicsOptions>(p => p.GetService<IDynamicsOptions>())
-            .TryAddCoreServices()
-
-            .TryAdd<IMethodCallTranslatorProvider, DynamicsMethodCallTranslatorProvider>()
-            .TryAdd<IMemberTranslatorProvider, DynamicsMemberTranslatorProvider>()
-            .TryAdd<IQuerySqlGeneratorFactory, DynamicsQuerySqlGeneratorFactory>()
+            .TryAdd<IDatabaseCreator>(p => p.GetRequiredService<IDynamicsDatabaseCreator>())
+            .TryAdd<IQueryContextFactory, DynamicsQueryContextFactory>()
+            .TryAdd<ITypeMappingSource, DynamicsTypeMappingSource>()
+            .TryAdd<IValueGeneratorSelector, DynamicsValueGeneratorSelector>()
+            .TryAdd<IQueryTranslationPreprocessorFactory, DynamicsQueryTranslationPreprocessorFactory>()
+            .TryAdd<IQueryCompilationContextFactory, DynamicsQueryCompilationContextFactory>()
             .TryAdd<IQueryTranslationPostprocessorFactory, DynamicsQueryTranslationPostprocessorFactory>()
-            .TryAdd<IRelationalSqlTranslatingExpressionVisitorFactory,
-                DynamicsSqlTranslatingExpressionVisitorFactory>()
+            .TryAdd<IQueryableMethodTranslatingExpressionVisitorFactory,
+                DynamicsQueryableMethodTranslatingExpressionVisitorFactory>()
+            .TryAdd<IShapedQueryCompilingExpressionVisitorFactory,
+                DynamicsShapedQueryCompilingExpressionVisitorFactory>()
             .TryAddProviderSpecificServices(b => b
-                .TryAddSingleton<IDynamicsValueGeneratorCache, DynamicsValueGeneratorCache>()
-                .TryAddSingleton<IDynamicsOptions, DynamicsOptions>()
-                .TryAddSingleton<IDynamicsUpdateSqlGenerator, DynamicsUpdateSqlGenerator>()
-                .TryAddSingleton<IDynamicsSequenceValueGeneratorFactory, DynamicsSequenceValueGeneratorFactory>()
-                .TryAddScoped<IDynamicsConnection, DynamicsConnection>())
+                .TryAddScoped<ITransactionEnlistmentManager, DynamicsTransactionEnlistmentManager>()
+                .TryAddScoped<IDynamicsDatabaseCreator, DynamicsDatabaseCreator>()
+            );
 
-            .TryAddCoreServices();
+
+        builder.TryAddCoreServices();
 
         // DynamicsCrmClient is scoped; it resolves IOrganizationServiceAsync2 from DI.
         // The consumer is responsible for registering IOrganizationServiceAsync2.

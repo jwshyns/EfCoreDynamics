@@ -10,14 +10,13 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.Xrm.Sdk;
 
-namespace EfCore.Dynamics365.Query;
+namespace EfCore.Dynamics365.Query.Visitors;
 
 /// <summary>
 /// Compiles a <see cref="ShapedQueryExpression"/> into an executable delegate
 /// that calls the Dataverse Web API and materialises CLR entities.
 /// </summary>
-public sealed class DynamicsShapedQueryCompilingExpressionVisitor
-    : ShapedQueryCompilingExpressionVisitor
+public sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryCompilingExpressionVisitor
 {
     private readonly bool _isAsync;
 
@@ -47,10 +46,16 @@ public sealed class DynamicsShapedQueryCompilingExpressionVisitor
                 .MakeGenericMethod(clrType);
 
             return Expression.Lambda(
-                Expression.Call(null, method,
-                    queryContextParam, dynQueryConst, entityTypeConst,
-                    Expression.Constant(CancellationToken.None)),
-                queryContextParam);
+                Expression.Call(
+                    null,
+                    method,
+                    queryContextParam,
+                    dynQueryConst,
+                    entityTypeConst,
+                    Expression.Constant(CancellationToken.None)
+                ),
+                queryContextParam
+            );
         }
         else
         {
@@ -60,7 +65,8 @@ public sealed class DynamicsShapedQueryCompilingExpressionVisitor
 
             return Expression.Lambda(
                 Expression.Call(null, method, queryContextParam, dynQueryConst, entityTypeConst),
-                queryContextParam);
+                queryContextParam
+            );
         }
     }
 }

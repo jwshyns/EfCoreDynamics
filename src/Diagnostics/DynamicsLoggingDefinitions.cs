@@ -2,4 +2,4 @@
 
 namespace EfCore.Dynamics365.Diagnostics;
 
-public class DynamicsLoggingDefinitions : RelationalLoggingDefinitions;
+public class DynamicsLoggingDefinitions : LoggingDefinitions;

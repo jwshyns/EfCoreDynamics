@@ -12,7 +12,7 @@ public class DynamicsClientOptions
     /// The root service URL, e.g. https://yourorg.api.crm.dynamics.com
     /// Used for display / logging only.
     /// </summary>
-    public string ServiceUrl { get; init; } = string.Empty;
+    public string ServiceUrl { get; set; } = string.Empty;
 
     internal void Validate()
     {
