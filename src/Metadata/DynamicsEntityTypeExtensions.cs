@@ -36,7 +36,7 @@ public static class DynamicsEntityTypeExtensions
     /// Gets the Dynamics entity logical name (e.g. "account").
     /// Falls back to the lower-cased CLR type name if not set.
     /// </summary>
-    public static string? GetEntityLogicalName(this IEntityType entityType)
+    public static string GetEntityLogicalName(this IEntityType entityType)
     {
         var annotation = entityType.FindAnnotation(DynamicsAnnotationNames.EntityLogicalName);
         if (annotation?.Value is string value) return value;

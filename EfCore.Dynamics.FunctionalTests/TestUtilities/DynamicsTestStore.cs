@@ -39,11 +39,12 @@ internal sealed class DynamicsTestStore : TestStore
                     }
                     case ExecuteMultipleRequest multipleRequest:
                     {
-                        OrganizationResponseCollection responses = [];
+                        ExecuteMultipleResponseItemCollection responses = [];
                         foreach (var req in multipleRequest.Requests)
                         {
                             var response = next(context, req);
-                            if (multipleRequest.Settings.ReturnResponses) responses.Add(response);
+                            if (multipleRequest.Settings.ReturnResponses) 
+                                responses.Add(new ExecuteMultipleResponseItem { Response = response });
                         }
 
                         return new ExecuteMultipleResponse

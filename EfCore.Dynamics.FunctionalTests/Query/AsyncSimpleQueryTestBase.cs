@@ -282,8 +282,7 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
         await using var context = CreateContext();
         var query = await context.Set<Customer>()
             .Where(c => c.City == "México D.F.")
-            .Concat(
-                context.Set<Customer>())
+            .Concat(context.Set<Customer>())
             .ToListAsync();
 
         Assert.Equal(96, query.Count);
@@ -295,9 +294,7 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
         await using var context = CreateContext();
         var query = await context.Set<Customer>()
             .Where(c => c.City == "México D.F.")
-            .Concat(
-                context.Set<Customer>()
-                    .Where(s => s.ContactTitle == "Owner"))
+            .Concat(context.Set<Customer>().Where(s => s.ContactTitle == "Owner"))
             .ToListAsync();
 
         Assert.Equal(22, query.Count);

@@ -54,25 +54,30 @@ internal sealed class DynamicsDatabase : Database
         CancellationToken cancellationToken = default
     )
     {
+        var deduplicatedEntries = entries
+            .GroupBy(e => (e.EntityType.GetEntityLogicalName(), GetPrimaryKeyGuid(e, e.EntityType)))
+            .Select(g => g.First())
+            .ToList();
+
         var hasCurrentTransaction = _transactionManager.CurrentTransaction != null;
 
         // explicit transaction
         if (hasCurrentTransaction)
-            return await CommitUpdates(entries, false, cancellationToken).ConfigureAwait(false);
+            return await CommitUpdates(deduplicatedEntries, true, cancellationToken).ConfigureAwait(false);
 
         var areAutoTransactionsEnabled = _currentDbContext.Context.Database.AutoTransactionsEnabled;
         var hasMultipleOperations = entries.Count > 1;
 
         // implicit transaction
         if (areAutoTransactionsEnabled && hasMultipleOperations)
-            return await CommitUpdates(entries, false, cancellationToken).ConfigureAwait(false);
+            return await CommitUpdates(deduplicatedEntries, true, cancellationToken).ConfigureAwait(false);
         
         // multiple operations in a single request but not in a transaction
         if (hasMultipleOperations)
-            return await CommitUpdates(entries, false, cancellationToken).ConfigureAwait(false);
+            return await CommitUpdates(deduplicatedEntries, false, cancellationToken).ConfigureAwait(false);
 
         // single operation in a single request
-        return await CommitUpdate(entries.First(), cancellationToken).ConfigureAwait(false);
+        return await CommitUpdate(deduplicatedEntries.First(), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<int> CommitUpdate(IUpdateEntry entry, CancellationToken cancellationToken)
@@ -80,7 +85,7 @@ internal sealed class DynamicsDatabase : Database
         switch (entry.EntityState)
         {
             case EfEntityState.Added:
-                await HandleAddedAsync(entry, entry.EntityType, cancellationToken);
+                await HandleAddedAsync(entry, cancellationToken);
                 return 1;
             case EfEntityState.Modified:
                 await HandleModifiedAsync(entry, entry.EntityType, cancellationToken);
@@ -182,11 +187,7 @@ internal sealed class DynamicsDatabase : Database
 
     // ── Operation handlers ────────────────────────────────────────────────
 
-    private async Task HandleAddedAsync(
-        IUpdateEntry entry,
-        IEntityType entityType,
-        CancellationToken cancellationToken
-    )
+    private async Task HandleAddedAsync(IUpdateEntry entry, CancellationToken cancellationToken)
     {
         var entity = BuildEntity(entry, modified: false);
         var newId = await _client.CreateAsync(entity, cancellationToken).ConfigureAwait(false);
@@ -223,8 +224,7 @@ internal sealed class DynamicsDatabase : Database
     )
     {
         var id = GetPrimaryKeyGuid(entry, entityType);
-        var logicalName = entityType.GetEntityLogicalName()
-                          ?? entityType.ClrType.Name.ToLowerInvariant();
+        var logicalName = entityType.GetEntityLogicalName();
         await _client.DeleteAsync(logicalName, id, cancellationToken).ConfigureAwait(false);
     }
 
@@ -237,8 +237,7 @@ internal sealed class DynamicsDatabase : Database
     private static Entity BuildEntity(IUpdateEntry entry, bool modified)
     {
         var entityType = entry.EntityType;
-        var logicalName = entityType.GetEntityLogicalName()
-                          ?? entityType.ClrType.Name.ToLowerInvariant();
+        var logicalName = entityType.GetEntityLogicalName();
 
         var entity = new Entity(logicalName);
 

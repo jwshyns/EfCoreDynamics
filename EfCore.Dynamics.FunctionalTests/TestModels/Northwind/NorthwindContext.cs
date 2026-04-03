@@ -62,8 +62,6 @@ public class NorthwindContext : PoolableDbContext
             e.Ignore(o => o.ShippedDate);
         });
 
-        modelBuilder.Entity<OrderDetail>(e => { e.HasKey(od => new { od.OrderID, od.ProductID }); });
-
 #pragma warning disable CS0618 // Type or member is obsolete
         modelBuilder
             .Query<CustomerView>()
