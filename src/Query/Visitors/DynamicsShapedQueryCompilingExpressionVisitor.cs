@@ -59,7 +59,7 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                     .GetMethod(nameof(DynamicsQueryExecutor.SelectAsync))!
                     .MakeGenericMethod(clrType, projType);
                 var compiled = CompileProjection(asyncProjection, clrType, projType);
-                result = Expression.Call(null, selectAsyncMethod, result, compiled);
+                result = Expression.Call(null, selectAsyncMethod, result, compiled, Expression.Constant(CancellationToken.None));
             }
 
             return result;

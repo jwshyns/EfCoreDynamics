@@ -77,6 +77,19 @@ internal sealed class CrmFilterExpressionVisitor
             case ExpressionType.Call:
                 return BuildMethodFilter((MethodCallExpression)expr);
 
+            case ExpressionType.MemberAccess:
+            {
+                var m = (MemberExpression)expr;
+                if (m.Type == typeof(bool) && IsMemberOnParameter(m))
+                {
+                    var filter = new FilterExpression(LogicalOperator.And);
+                    filter.AddCondition(LogicalName(m.Member.Name), ConditionOperator.Equal, true);
+                    return filter;
+                }
+                throw new NotSupportedException(
+                    $"Member access '{m.Member.Name}' is not supported in Dynamics 365 filters.");
+            }
+
             default:
                 throw new NotSupportedException(
                     $"Expression node {expr.NodeType} is not supported in Dynamics 365 filters.");
@@ -91,13 +104,9 @@ internal sealed class CrmFilterExpressionVisitor
     private static void MergeInto(FilterExpression parent, FilterExpression child)
     {
         if (child.FilterOperator == parent.FilterOperator && child.Filters.Count == 0)
-        {
             foreach (var c in child.Conditions) parent.AddCondition(c);
-        }
         else
-        {
             parent.AddFilter(child);
-        }
     }
 
     // ── Comparison ────────────────────────────────────────────────────────
@@ -185,7 +194,6 @@ internal sealed class CrmFilterExpressionVisitor
             {
                 var logicalName = LogicalName(memberName);
                 if (Evaluate(node.Arguments[0]) is string arg)
-                {
                     switch (node.Method.Name)
                     {
                         case "Contains":
@@ -198,7 +206,6 @@ internal sealed class CrmFilterExpressionVisitor
                             filter.AddCondition(logicalName, ConditionOperator.EndsWith, arg);
                             return filter;
                     }
-                }
             }
         }
 
@@ -299,7 +306,6 @@ internal sealed class CrmFilterExpressionVisitor
     private static object? Evaluate(Expression expr)
     {
         while (true)
-        {
             switch (expr)
             {
                 case ConstantExpression c:
@@ -317,6 +323,5 @@ internal sealed class CrmFilterExpressionVisitor
                         return null;
                     }
             }
-        }
     }
 }
