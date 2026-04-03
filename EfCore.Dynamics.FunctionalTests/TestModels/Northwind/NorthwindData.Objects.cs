@@ -2528,7 +2528,7 @@ Winchester Way",
         [
             new Order
             {
-                OrderID = new Guid("e47d0f53-43be-57df-aecb-6c355d031b72"),
+                OrderID = OrderId,
                 CustomerID = new Guid("bf0038ad-3c0b-5dbb-8140-da7a6c2d27d5"),
                 EmployeeID = new Guid("f9f87b3f-286e-56f5-aecc-d909c840ef05"),
                 OrderDate = new DateTime(1996, 7, 4),
@@ -16647,7 +16647,7 @@ Winchester Way",
         [
             new OrderDetail
             {
-                OrderID = new Guid("e47d0f53-43be-57df-aecb-6c355d031b72"),
+                OrderID = OrderId,
                 ProductID = new Guid("d190a9de-4e70-5a83-9c43-3bcec88bd25e"),
                 UnitPrice = 14.0000m,
                 Quantity = 12,
@@ -16655,7 +16655,7 @@ Winchester Way",
             },
             new OrderDetail
             {
-                OrderID = new Guid("e47d0f53-43be-57df-aecb-6c355d031b72"),
+                OrderID = OrderId,
                 ProductID = new Guid("24a426f5-682c-5601-8840-f71eb544a32e"),
                 UnitPrice = 9.8000m,
                 Quantity = 10,
@@ -16663,7 +16663,7 @@ Winchester Way",
             },
             new OrderDetail
             {
-                OrderID = new Guid("e47d0f53-43be-57df-aecb-6c355d031b72"),
+                OrderID = OrderId,
                 ProductID = new Guid("71c6075f-8e53-50cd-abae-b2be7a0516bd"),
                 UnitPrice = 34.8000m,
                 Quantity = 5,

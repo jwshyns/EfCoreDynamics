@@ -12,6 +12,7 @@ internal sealed partial class NorthwindData : ISetSource
     public static readonly Guid AlfkiId = new("00000000-0000-0000-0000-000000000001");
     public static readonly Guid AnatrId = new("00000000-0000-0000-0000-000000000002");
     public static readonly Guid AntonId = new("00000000-0000-0000-0000-000000000003");
+    public static readonly Guid OrderId = new("e47d0f53-43be-57df-aecb-6c355d031b72");
 
     private readonly Customer[] _customers;
     private readonly CustomerView[] _customerViews;

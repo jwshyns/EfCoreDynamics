@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using EfCore.Dynamics365.Metadata;
 using EfCore.Dynamics365.Query.Crm;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -249,6 +250,10 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
             {
                 case MemberExpression m when m.Expression == param:
                 {
+                    if (dynQuery.EntityType.FindNavigation(m.Member.Name) != null)
+                        throw new NotSupportedException(
+                            $"Navigation property '{m.Member.Name}' in Select projections is not supported by the Dynamics 365 provider.");
+
                     var prop = dynQuery.EntityType.FindProperty(m.Member.Name);
                     if (prop != null) dynQuery.AddSelectField(prop.GetAttributeLogicalName());
                     break;

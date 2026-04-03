@@ -54,7 +54,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
             .Select(c => new
             {
                 c.CustomerID,
-                Posts = context.Orders.Where(o => o.CustomerID == c.CustomerID)
+                Posts = context.Orders
+                    .Where(o => o.CustomerID == c.CustomerID)
                     .Select(m => new { m.CustomerID })
                     .ToList()
             })
@@ -66,7 +67,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     {
         await using var context = CreateContext();
         var results
-            = await context.Customers.Select(c => new { Orders = c.Orders.ToArray() })
+            = await context.Customers
+                .Select(c => new { Orders = c.Orders.ToArray() })
                 .ToListAsync();
 
         Assert.Equal(830, results.SelectMany(a => a.Orders).ToList().Count);
@@ -77,10 +79,10 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     {
         await using var context = CreateContext();
         var results
-            = await context.Customers.Select(c => new
+            = await context.Customers
+                .Select(c => new
                 {
-                    Orders = c.Orders.Select(o => new { OrderDetails = o.OrderDetails.ToArray() })
-                        .ToArray()
+                    Orders = c.Orders.Select(o => new { OrderDetails = o.OrderDetails.ToArray() }).ToArray()
                 })
                 .ToListAsync();
 
@@ -92,7 +94,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     {
         await using var context = CreateContext();
         var results
-            = await context.Customers.Select(c => new { Orders = c.Orders.ToList() })
+            = await context.Customers
+                .Select(c => new { Orders = c.Orders.ToList() })
                 .ToListAsync();
 
         Assert.Equal(830, results.SelectMany(a => a.Orders).ToList().Count);
@@ -103,7 +106,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     {
         await using var context = CreateContext();
         var results
-            = await context.Customers.Select(c => new { Orders = c.Orders.Where(o => o.Freight > 10).ToList() })
+            = await context.Customers
+                .Select(c => new { Orders = c.Orders.Where(o => o.Freight > 10).ToList() })
                 .ToListAsync();
 
         Assert.Equal(830, results.SelectMany(a => a.Orders).ToList().Count);
@@ -114,7 +118,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     {
         await using var context = CreateContext();
         var results
-            = await context.Customers.Select(c => new { Ave = c.Orders.Average(o => o.ShipVia) })
+            = await context.Customers
+                .Select(c => new { Ave = c.Orders.Average(o => o.ShipVia) })
                 .ToListAsync();
 
         Assert.Equal(91, results.ToList().Count);
