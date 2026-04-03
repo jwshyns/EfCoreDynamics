@@ -56,7 +56,7 @@ public static class DynamicsEntityTypeExtensions
     /// Gets the Dynamics attribute logical name for a property (e.g. "accountid").
     /// Falls back to lower-case CLR property name if not set.
     /// </summary>
-    public static string? GetAttributeLogicalName(this IProperty property)
+    public static string GetAttributeLogicalName(this IProperty property)
     {
         var annotation = property.FindAnnotation(DynamicsAnnotationNames.AttributeLogicalName);
         if (annotation?.Value is string value) return value;

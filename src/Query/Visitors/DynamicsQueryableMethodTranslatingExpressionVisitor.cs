@@ -13,8 +13,7 @@ namespace EfCore.Dynamics365.Query.Visitors;
 /// Translates LINQ queryable method calls (Where, Select, Take, Skip, OrderBy, etc.)
 /// into mutations on a <see cref="DynamicsQueryExpression"/>.
 /// </summary>
-public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
-    : QueryableMethodTranslatingExpressionVisitor
+internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : QueryableMethodTranslatingExpressionVisitor
 {
     private readonly IModel _model;
     private readonly QueryableMethodTranslatingExpressionVisitorDependencies _dependencies;
@@ -47,13 +46,11 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
 
     protected override ShapedQueryExpression CreateShapedQueryExpression(Type elementType)
     {
-        var entityType = _model.GetEntityTypes()
-                             .FirstOrDefault(e => e.ClrType == elementType)
+        var entityType = _model.GetEntityTypes().FirstOrDefault(e => e.ClrType == elementType)
                          ?? throw new InvalidOperationException(
                              $"Entity type {elementType.Name} is not registered in the model.");
 
-        var entityLogicalName = entityType.GetEntityLogicalName()
-                                ?? entityType.ClrType.Name.ToLowerInvariant();
+        var entityLogicalName = entityType.GetEntityLogicalName();
 
         var queryExpr = new DynamicsQueryExpression(entityType, entityLogicalName);
         var shaperExpr = new EntityShaperExpression(
@@ -109,8 +106,8 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         if (keySelector.Body is not MemberExpression m) return;
 
         var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
-        var prop = dynQuery.EntityType.FindProperty(m.Member.Name);
-        var field = prop?.GetAttributeLogicalName() ?? m.Member.Name.ToLowerInvariant();
+        var prop = dynQuery.EntityType.FindProperty(m.Member.Name) ?? throw new Exception();
+        var field = prop.GetAttributeLogicalName();
         dynQuery.AddOrderBy(field, ascending);
     }
 
@@ -123,7 +120,7 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     {
         ApplyCountParam(count, (DynamicsQueryExpression)source.QueryExpression,
             setConstant: (d, v) => d.SetTop(v),
-            setParam:    (d, n) => d.SetTopParameterName(n));
+            setParam: (d, n) => d.SetTopParameterName(n));
         return source;
     }
 
@@ -134,7 +131,7 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
     {
         ApplyCountParam(count, (DynamicsQueryExpression)source.QueryExpression,
             setConstant: (d, v) => d.SetSkip(v),
-            setParam:    (d, n) => d.SetSkipParameterName(n));
+            setParam: (d, n) => d.SetSkipParameterName(n));
         return source;
     }
 
@@ -147,8 +144,7 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         bool returnDefault
     )
     {
-        if (predicate != null)
-            source = TranslateWhere(source, predicate);
+        source = TranslateWhere(source, predicate);
         ((DynamicsQueryExpression)source.QueryExpression).SetSingleRow();
         return source;
     }
@@ -158,8 +154,7 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         LambdaExpression predicate,
         Type returnType,
         bool returnDefault
-    )
-        => TranslateFirstOrDefault(source, predicate, returnType, returnDefault);
+    ) => TranslateFirstOrDefault(source, predicate, returnType, returnDefault);
 
     // ── Count / LongCount ─────────────────────────────────────────────────
 
@@ -168,59 +163,65 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         LambdaExpression predicate
     )
     {
-        if (predicate != null) TranslateWhere(source, predicate);
+        TranslateWhere(source, predicate);
         return source;
     }
 
     protected override ShapedQueryExpression TranslateLongCount(
         ShapedQueryExpression source,
         LambdaExpression predicate
-    )
-        => TranslateCount(source, predicate);
+    ) => TranslateCount(source, predicate);
 
     // ── Unsupported ───────────────────────────────────────────────────────
 
     protected override ShapedQueryExpression TranslateAll(ShapedQueryExpression source, LambdaExpression predicate) =>
-        null!;
+        throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateAny(ShapedQueryExpression source, LambdaExpression predicate) =>
-        null!;
+        throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateAverage(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => null!;
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType) => null!;
+    protected override ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType) =>
+        throw new NotImplementedException();
 
-    protected override ShapedQueryExpression
-        TranslateConcat(ShapedQueryExpression source, ShapedQueryExpression second) => null!;
+    protected override ShapedQueryExpression TranslateConcat(
+        ShapedQueryExpression source,
+        ShapedQueryExpression second
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item) => null!;
+    protected override ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item) =>
+        throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateDefaultIfEmpty(
         ShapedQueryExpression source,
         Expression defaultValue
-    ) => null!;
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression TranslateDistinct(ShapedQueryExpression source) => null!;
+    protected override ShapedQueryExpression TranslateDistinct(ShapedQueryExpression source) =>
+        throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateElementAtOrDefault(
         ShapedQueryExpression source,
         Expression index,
         bool returnDefault
-    ) => null!;
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression
-        TranslateExcept(ShapedQueryExpression source, ShapedQueryExpression second) => null!;
+    protected override ShapedQueryExpression TranslateExcept(
+        ShapedQueryExpression source,
+        ShapedQueryExpression second
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateGroupBy(
         ShapedQueryExpression source,
         LambdaExpression keySelector,
         LambdaExpression elementSelector,
         LambdaExpression resultSelector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateGroupJoin(
         ShapedQueryExpression outer,
@@ -228,12 +229,12 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateIntersect(
         ShapedQueryExpression source,
         ShapedQueryExpression second
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateJoin(
         ShapedQueryExpression outer,
@@ -241,14 +242,14 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateLastOrDefault(
         ShapedQueryExpression source,
         LambdaExpression predicate,
         Type returnType,
         bool returnDefault
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateLeftJoin(
         ShapedQueryExpression outer,
@@ -256,22 +257,25 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateMax(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateMin(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => null!;
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression TranslateOfType(ShapedQueryExpression source, Type resultType) => null!;
-    protected override ShapedQueryExpression TranslateReverse(ShapedQueryExpression source) => null!;
+    protected override ShapedQueryExpression TranslateOfType(ShapedQueryExpression source, Type resultType) =>
+        throw new NotImplementedException();
+
+    protected override ShapedQueryExpression TranslateReverse(ShapedQueryExpression source) =>
+        throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateSelect(ShapedQueryExpression source, LambdaExpression selector) =>
         source;
@@ -280,31 +284,33 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         ShapedQueryExpression source,
         LambdaExpression collectionSelector,
         LambdaExpression resultSelector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateSelectMany(
         ShapedQueryExpression source,
         LambdaExpression selector
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateSkipWhile(
         ShapedQueryExpression source,
         LambdaExpression predicate
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateSum(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => null!;
+    ) => throw new NotImplementedException();
 
     protected override ShapedQueryExpression TranslateTakeWhile(
         ShapedQueryExpression source,
         LambdaExpression predicate
-    ) => null!;
+    ) => throw new NotImplementedException();
 
-    protected override ShapedQueryExpression
-        TranslateUnion(ShapedQueryExpression source, ShapedQueryExpression second) => null!;
+    protected override ShapedQueryExpression TranslateUnion(
+        ShapedQueryExpression source,
+        ShapedQueryExpression second
+    ) => throw new NotImplementedException();
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -312,11 +318,17 @@ public sealed class DynamicsQueryableMethodTranslatingExpressionVisitor
         Expression count,
         DynamicsQueryExpression dynExpr,
         Action<DynamicsQueryExpression, int> setConstant,
-        Action<DynamicsQueryExpression, string> setParam)
+        Action<DynamicsQueryExpression, string> setParam
+    )
     {
-        if (count is ConstantExpression { Value: int value })
-            setConstant(dynExpr, value);
-        else if (count is ParameterExpression { Name: { } name })
-            setParam(dynExpr, name);
+        switch (count)
+        {
+            case ConstantExpression { Value: int value }:
+                setConstant(dynExpr, value);
+                break;
+            case ParameterExpression { Name: { } name }:
+                setParam(dynExpr, name);
+                break;
+        }
     }
 }

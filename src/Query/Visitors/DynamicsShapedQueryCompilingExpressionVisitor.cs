@@ -16,7 +16,7 @@ namespace EfCore.Dynamics365.Query.Visitors;
 /// Compiles a <see cref="ShapedQueryExpression"/> into an executable delegate
 /// that calls the Dataverse Web API and materialises CLR entities.
 /// </summary>
-public sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryCompilingExpressionVisitor
+internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQueryCompilingExpressionVisitor
 {
     private readonly bool _isAsync;
 
@@ -180,5 +180,5 @@ public static class DynamicsQueryExecutor
     }
 
     private static int? ResolveCount(int? constant, string? paramName, QueryContext ctx)
-        => constant ?? (paramName is { } n ? (int?)ctx.ParameterValues[n] : null);
+        => constant ?? (paramName != null ? (int?)ctx.ParameterValues[paramName] : null);
 }
