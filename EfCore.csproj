@@ -25,14 +25,17 @@
 
   <ItemGroup>
     <Compile Remove="tests\**" />
+    <Compile Remove="EfCore.Dynamics.FunctionalTests\**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Remove="tests\**" />
+    <EmbeddedResource Remove="EfCore.Dynamics.FunctionalTests\**" />
   </ItemGroup>
 
   <ItemGroup>
     <None Remove="tests\**" />
+    <None Remove="EfCore.Dynamics.FunctionalTests\**" />
   </ItemGroup>
 
 </Project>

@@ -64,10 +64,10 @@ public class CrudTests
         var id = Guid.NewGuid();
         var xrmCtx = Util.BuildContext();
         var orgService = xrmCtx.GetAsyncOrganizationService2();
-        xrmCtx.Initialize(new[] { EfCoreXrmTestHelper.AccountEntity(id, "Old Name") });
+        xrmCtx.Initialize([EfCoreXrmTestHelper.AccountEntity(id, "Old Name")]);
         using var ctx = EfCoreXrmTestHelper.CreateContext(orgService);
 
-        var account = ctx.Accounts.First(a => a.AccountId == id);
+        var account = ctx.Accounts.First(a => a.Name == "Old Name");
         account.Name = "New Name";
         ctx.SaveChanges();
 
@@ -83,7 +83,7 @@ public class CrudTests
         var id = Guid.NewGuid();
         var xrmCtx = Util.BuildContext();
         var orgService = xrmCtx.GetAsyncOrganizationService2();
-        xrmCtx.Initialize(new[] { EfCoreXrmTestHelper.AccountEntity(id, "To Delete") });
+        xrmCtx.Initialize([EfCoreXrmTestHelper.AccountEntity(id, "To Delete")]);
         using var ctx = EfCoreXrmTestHelper.CreateContext(orgService);
 
         var account = ctx.Accounts.First(a => a.AccountId == id);
@@ -101,7 +101,7 @@ public class CrudTests
         var existingId = Guid.NewGuid();
         var xrmCtx = Util.BuildContext();
         var orgService = xrmCtx.GetAsyncOrganizationService2();
-        xrmCtx.Initialize(new[] { EfCoreXrmTestHelper.AccountEntity(existingId, "Old") });
+        xrmCtx.Initialize([EfCoreXrmTestHelper.AccountEntity(existingId, "Old")]);
         using var ctx = EfCoreXrmTestHelper.CreateContext(orgService);
 
         // Delete the existing record

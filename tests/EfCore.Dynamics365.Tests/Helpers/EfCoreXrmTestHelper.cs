@@ -18,21 +18,9 @@ public static class EfCoreXrmTestHelper
 {
     public static TestCrmContext CreateContext(IOrganizationServiceAsync2 orgService)
     {
-        // Build the EF Core internal service provider with all provider services                                                                                                                                                                                                                 
-        // plus the fake org service. Must call AddEntityFrameworkDynamics365 directly                                                                                                                                                                                                            
-        // so the DynamicsOptionsExtension lands in the SAME options chain as                                                                                                                                                                                                                     
-        // UseInternalServiceProvider — the two-step rawOptions copy drops it.   
-        var services = new ServiceCollection();
-        services.AddLogging();                                                                                                                                                                                                                                                         
-        services.AddSingleton<IOrganizationServiceAsync2>(_ => orgService);                                                                                                                                                                                                                                                            
-        services.AddEntityFrameworkDynamics365();
-
-        var sp = services.BuildServiceProvider();
-
         return new TestCrmContext(
             new DbContextOptionsBuilder<TestCrmContext>()
-                .UseDynamics365("https://test.crm.dynamics.com")
-                .UseInternalServiceProvider(sp)
+                .UseDynamics365(orgService)
                 .Options);
     }
 

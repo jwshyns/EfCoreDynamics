@@ -1,18 +1,26 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using EfCore.Dynamics365.Client;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EfCore.Dynamics365.Storage;
 
-public interface IDynamicsDatabaseCreator: IDatabaseCreator;
+internal interface IDynamicsDatabaseCreator: IDatabaseCreator;
 
 /// <summary>
 /// Dataverse does not require schema creation — this implementation
 /// is a no-op that always reports the "database" as existing.
 /// </summary>
-public sealed class DynamicsDatabaseCreator : IDynamicsDatabaseCreator
+internal sealed class DynamicsDatabaseCreator : IDynamicsDatabaseCreator
 {
+    private IDynamicsClient _dynamicsClient;
+
+    public DynamicsDatabaseCreator(IDynamicsClient dynamicsClient)
+    {
+        _dynamicsClient = dynamicsClient;
+    }
+
     public bool EnsureCreated()
     {
         throw new NotSupportedException();

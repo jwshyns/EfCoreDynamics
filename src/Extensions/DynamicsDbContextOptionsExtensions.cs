@@ -1,21 +1,11 @@
+using EfCore.Dynamics365.Client;
 using EfCore.Dynamics365.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.PowerPlatform.Dataverse.Client;
 
 namespace EfCore.Dynamics365.Extensions;
 
-/// <summary>
-/// Extension methods on <see cref="DbContextOptionsBuilder"/> for configuring
-/// the Dynamics 365 / Dataverse EF Core provider.
-///
-/// <para>
-/// After calling <c>UseDynamics365</c>, register your <c>IOrganizationService</c>
-/// implementation in the DI container:
-/// <code>
-///   services.AddScoped&lt;IOrganizationService&gt;(_ => new ServiceClient(connectionString));
-/// </code>
-/// </para>
-/// </summary>
 public static class DynamicsDbContextOptionsExtensions
 {
     /// <summary>
@@ -36,12 +26,32 @@ public static class DynamicsDbContextOptionsExtensions
         return optionsBuilder;
     }
 
+    public static DbContextOptionsBuilder UseDynamics365(
+        this DbContextOptionsBuilder optionsBuilder,
+        IOrganizationServiceAsync2 organizationServiceAsync2
+    )
+    {
+        var ext = new DynamicsOptionsExtension().WithOrganisationAsync2(organizationServiceAsync2);
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(ext);
+        return optionsBuilder;
+    }
+    
+    public static DbContextOptionsBuilder<TContext> UseDynamics365<TContext>(
+        this DbContextOptionsBuilder<TContext> optionsBuilder,
+        IOrganizationServiceAsync2 organizationServiceAsync2
+    )  where TContext : DbContext
+    {
+        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(
+            organizationServiceAsync2);
+    }
+
     /// <summary>Generic <see cref="DbContextOptionsBuilder{TContext}"/> overload.</summary>
     public static DbContextOptionsBuilder<TContext> UseDynamics365<TContext>(
         this DbContextOptionsBuilder<TContext> optionsBuilder,
         string connectionString
     ) where TContext : DbContext
     {
-        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(connectionString);
+        return (DbContextOptionsBuilder<TContext>)((DbContextOptionsBuilder)optionsBuilder).UseDynamics365(
+            connectionString);
     }
 }

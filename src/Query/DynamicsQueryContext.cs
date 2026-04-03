@@ -5,16 +5,16 @@ using Microsoft.EntityFrameworkCore.Query;
 namespace EfCore.Dynamics365.Query;
 
 /// <summary>
-/// Per-query execution context. Carries the <see cref="DynamicsCrmClient"/>
+/// Per-query execution context. Carries the <see cref="IDynamicsClient"/>
 /// so compiled query delegates can access it at runtime.
 /// </summary>
-public sealed class DynamicsQueryContext : QueryContext
+internal sealed class DynamicsQueryContext : QueryContext
 {
-    public DynamicsCrmClient Client { get; }
+    public IDynamicsClient Client { get; }
 
     public DynamicsQueryContext(
         QueryContextDependencies dependencies,
-        DynamicsCrmClient client)
+        IDynamicsClient client)
         : base(dependencies)
     {
         Client = client ?? throw new ArgumentNullException(nameof(client));

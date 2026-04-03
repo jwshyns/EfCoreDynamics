@@ -2,23 +2,47 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using EfCore.Dynamics365.Infrastructure;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace EfCore.Dynamics365.Client;
 
+internal interface IDynamicsClient
+{
+    /// <summary>
+    /// Executes the query and returns all matching records, walking pages
+    /// automatically when <see cref="QueryExpression.TopCount"/> is not set.
+    /// </summary>
+    public Task<IList<Entity>> QueryAsync(
+        string logicalName,
+        QueryExpression query,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>Creates a record and returns its new primary-key GUID.</summary>
+    public Task<Guid> CreateAsync(Entity entity, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates a record (PATCH semantics — only supplied attributes are changed).</summary>
+    public Task UpdateAsync(Entity entity, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes a record by logical name and primary-key GUID.</summary>
+    public Task DeleteAsync(string logicalName, Guid id, CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// Thin wrapper around <see cref="IOrganizationServiceAsync2"/> that handles
 /// paged retrieval and provides the four CRUD primitives used by the provider.
 /// </summary>
-public sealed class DynamicsCrmClient
+internal sealed class DynamicsClient : IDynamicsClient
 {
     private readonly IOrganizationServiceAsync2 _service;
 
-    public DynamicsCrmClient(IOrganizationServiceAsync2 service)
+    public DynamicsClient(IDbContextOptions dbContextOptions)
     {
-        _service = service ?? throw new ArgumentNullException(nameof(service));
+        _service = dbContextOptions.FindExtension<DynamicsOptionsExtension>().OrganisationServiceAsync2!;
     }
 
     /// <summary>

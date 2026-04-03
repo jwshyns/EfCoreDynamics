@@ -53,17 +53,12 @@ public static class DynamicsServiceCollectionExtensions
             .TryAdd<IShapedQueryCompilingExpressionVisitorFactory,
                 DynamicsShapedQueryCompilingExpressionVisitorFactory>()
             .TryAddProviderSpecificServices(b => b
+                .TryAddScoped<IDynamicsClient, DynamicsClient>()
                 .TryAddScoped<ITransactionEnlistmentManager, DynamicsTransactionEnlistmentManager>()
                 .TryAddScoped<IDynamicsDatabaseCreator, DynamicsDatabaseCreator>()
             );
 
-
         builder.TryAddCoreServices();
-
-        // DynamicsCrmClient is scoped; it resolves IOrganizationServiceAsync2 from DI.
-        // The consumer is responsible for registering IOrganizationServiceAsync2.
-        services.TryAddScoped(sp =>
-            new DynamicsCrmClient(sp.GetRequiredService<IOrganizationServiceAsync2>()));
 
         return services;
     }

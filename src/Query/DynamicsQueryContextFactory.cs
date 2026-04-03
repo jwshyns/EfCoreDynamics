@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore.Query;
 namespace EfCore.Dynamics365.Query;
 
 /// <inheritdoc />
-public sealed class DynamicsQueryContextFactory : IQueryContextFactory
+internal sealed class DynamicsQueryContextFactory : IQueryContextFactory
 {
     private readonly QueryContextDependencies _dependencies;
-    private readonly DynamicsCrmClient _client;
+    private readonly IDynamicsClient _client;
 
     public DynamicsQueryContextFactory(
         QueryContextDependencies dependencies,
-        DynamicsCrmClient client)
+        IDynamicsClient client)
     {
         _dependencies = dependencies;
         _client = client;

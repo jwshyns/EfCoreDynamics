@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="EfCore.csproj" />
+  <Project Path="EfCore.Dynamics.FunctionalTests/EfCore.Dynamics.FunctionalTests.csproj" />
   <Project Path="tests/EfCore.Dynamics365.Tests/EfCore.Dynamics365.Tests.csproj" />
 </Solution>

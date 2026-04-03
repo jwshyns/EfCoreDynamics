@@ -1,8 +1,9 @@
-using System;
 using System.Collections.Generic;
+using EfCore.Dynamics365.Client;
 using EfCore.Dynamics365.Extensions;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.PowerPlatform.Dataverse.Client;
 
 namespace EfCore.Dynamics365.Infrastructure;
 
@@ -15,14 +16,25 @@ public sealed class DynamicsOptionsExtension : IDbContextOptionsExtension
     private DbContextOptionsExtensionInfo? _info;
     
     public string? ConnectionString { get; private set; }
+    
+    public IOrganizationServiceAsync2? OrganisationServiceAsync2 { get; private set; }
 
     public DynamicsOptionsExtension() { }
 
     private DynamicsOptionsExtension(DynamicsOptionsExtension src)
     {
+        ConnectionString = src.ConnectionString;
+        OrganisationServiceAsync2 = src.OrganisationServiceAsync2;
     }
 
     private DynamicsOptionsExtension Clone() => new(this);
+    
+    public DynamicsOptionsExtension WithOrganisationAsync2(IOrganizationServiceAsync2 organizationServiceAsync2)
+    {
+        var clone = Clone();
+        clone.OrganisationServiceAsync2 = organizationServiceAsync2;
+        return clone;
+    }
     
     public DynamicsOptionsExtension WithConnectionString(string connectionString)
     {

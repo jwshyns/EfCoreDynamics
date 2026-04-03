@@ -17,21 +17,29 @@ namespace EfCore.Dynamics365.Storage;
 /// Handles SaveChanges by translating EF Core change-tracker entries into
 /// Dataverse create / update / delete SDK calls.
 /// </summary>
-public sealed class DynamicsDatabase : Database
+internal sealed class DynamicsDatabase : Database
 {
-    private readonly DynamicsCrmClient _client;
+    private readonly IDynamicsClient _client;
+    private readonly IDbContextTransactionManager _transactionManager;
 
     public DynamicsDatabase(
         DatabaseDependencies dependencies,
-        DynamicsCrmClient client)
+        IDynamicsClient client,
+        IDbContextTransactionManager transactionManager
+    )
         : base(dependencies)
     {
         _client = client;
+        _transactionManager = transactionManager;
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────
 
-    public override int SaveChanges(IList<IUpdateEntry> entries) => SaveChangesAsync(entries).GetAwaiter().GetResult();
+    public override int SaveChanges(IList<IUpdateEntry> entries)
+    {
+        // TODO: update to handle explicit and implicit transactions
+        return SaveChangesAsync(entries).GetAwaiter().GetResult();
+    }
 
     // ── Async ─────────────────────────────────────────────────────────────
 
@@ -39,6 +47,7 @@ public sealed class DynamicsDatabase : Database
         IList<IUpdateEntry> entries,
         CancellationToken cancellationToken = default)
     {
+        // TODO: update to handle explicit and implicit transactions
         var saved = 0;
 
         foreach (var entry in entries)
