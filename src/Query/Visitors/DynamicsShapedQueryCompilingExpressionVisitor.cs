@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using EfCore.Dynamics365.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -41,27 +43,59 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
 
         if (_isAsync)
         {
-            var method = typeof(DynamicsQueryExecutor)
+            var executeMethod = typeof(DynamicsQueryExecutor)
                 .GetMethod(nameof(DynamicsQueryExecutor.ExecuteAsync))!
                 .MakeGenericMethod(clrType);
 
-            return Expression.Call(
-                null,
-                method,
-                queryContextParam,
-                dynQueryConst,
-                entityTypeConst,
-                Expression.Constant(CancellationToken.None)
-            );
+            Expression result = Expression.Call(
+                null, executeMethod,
+                queryContextParam, dynQueryConst, entityTypeConst,
+                Expression.Constant(CancellationToken.None));
+
+            if (dynExpr.Projection is { } asyncProjection)
+            {
+                var projType = asyncProjection.ReturnType;
+                var selectAsyncMethod = typeof(DynamicsQueryExecutor)
+                    .GetMethod(nameof(DynamicsQueryExecutor.SelectAsync))!
+                    .MakeGenericMethod(clrType, projType);
+                var compiled = CompileProjection(asyncProjection, clrType, projType);
+                result = Expression.Call(null, selectAsyncMethod, result, compiled);
+            }
+
+            return result;
         }
         else
         {
-            var method = typeof(DynamicsQueryExecutor)
+            var executeMethod = typeof(DynamicsQueryExecutor)
                 .GetMethod(nameof(DynamicsQueryExecutor.Execute))!
                 .MakeGenericMethod(clrType);
 
-            return Expression.Call(null, method, queryContextParam, dynQueryConst, entityTypeConst);
+            Expression result = Expression.Call(
+                null, executeMethod,
+                queryContextParam, dynQueryConst, entityTypeConst);
+
+            if (dynExpr.Projection is { } projection)
+            {
+                var projType = projection.ReturnType;
+                var selectMethod = typeof(Enumerable)
+                    .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .First(m => m.Name == nameof(Enumerable.Select)
+                                && m.GetParameters().Length == 2
+                                && m.GetParameters()[1].ParameterType.GetGenericArguments().Length == 2)
+                    .MakeGenericMethod(clrType, projType);
+                var compiled = CompileProjection(projection, clrType, projType);
+                result = Expression.Call(null, selectMethod, result, compiled);
+            }
+
+            return result;
         }
+    }
+
+    private static Expression CompileProjection(LambdaExpression projection, Type entityType, Type projType)
+    {
+        var funcType = typeof(Func<,>).MakeGenericType(entityType, projType);
+        var typedLambda = Expression.Lambda(funcType, projection.Body, projection.Parameters);
+        return Expression.Constant(typedLambda.Compile(), funcType);
     }
 }
 
@@ -177,6 +211,15 @@ public static class DynamicsQueryExecutor
         if (underlying.IsEnum) return Enum.ToObject(underlying, Convert.ToInt32(rawValue));
 
         return rawValue is IConvertible ? Convert.ChangeType(rawValue, underlying) : rawValue;
+    }
+
+    public static async IAsyncEnumerable<TResult> SelectAsync<T, TResult>(
+        IAsyncEnumerable<T> source,
+        Func<T, TResult> selector,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
+            yield return selector(item);
     }
 
     private static int? ResolveCount(int? constant, string? paramName, QueryContext ctx)

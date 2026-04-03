@@ -172,56 +172,152 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression predicate
     ) => TranslateCount(source, predicate);
 
+    // ── Any ───────────────────────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateAny(ShapedQueryExpression source, LambdaExpression predicate)
+    {
+        source = TranslateWhere(source, predicate);
+        ((DynamicsQueryExpression)source.QueryExpression).SetSingleRow();
+        return source;
+    }
+
+    // ── Last / LastOrDefault ──────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateLastOrDefault(
+        ShapedQueryExpression source,
+        LambdaExpression predicate,
+        Type returnType,
+        bool returnDefault
+    )
+    {
+        source = TranslateWhere(source, predicate);
+        var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
+        dynQuery.ReverseOrders();
+        dynQuery.SetSingleRow();
+        return source;
+    }
+
+    // ── Reverse ───────────────────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateReverse(ShapedQueryExpression source)
+    {
+        ((DynamicsQueryExpression)source.QueryExpression).ReverseOrders();
+        return source;
+    }
+
+    // ── Cast / OfType ─────────────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType) => source;
+
+    protected override ShapedQueryExpression TranslateOfType(ShapedQueryExpression source, Type resultType) => source;
+
+    // ── DefaultIfEmpty ────────────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateDefaultIfEmpty(
+        ShapedQueryExpression source,
+        Expression defaultValue
+    ) => source;
+
+    // ── Select ────────────────────────────────────────────────────────────
+
+    protected override ShapedQueryExpression TranslateSelect(ShapedQueryExpression source, LambdaExpression selector)
+    {
+        // Identity projection — nothing to do.
+        if (selector.Body is ParameterExpression p && p == selector.Parameters[0])
+            return source;
+
+        var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
+
+        // Narrow the Dataverse ColumnSet to only the properties actually referenced.
+        ExtractMemberAccesses(selector.Body, selector.Parameters[0], dynQuery);
+
+        // Store the projection so the compilation visitor can apply it in-memory.
+        dynQuery.SetProjection(selector);
+
+        return source;
+    }
+
+    private static void ExtractMemberAccesses(
+        Expression body,
+        ParameterExpression param,
+        DynamicsQueryExpression dynQuery
+    )
+    {
+        while (true)
+        {
+            switch (body)
+            {
+                case MemberExpression m when m.Expression == param:
+                {
+                    var prop = dynQuery.EntityType.FindProperty(m.Member.Name);
+                    if (prop != null) dynQuery.AddSelectField(prop.GetAttributeLogicalName());
+                    break;
+                }
+                case NewExpression ne:
+                    foreach (var arg in ne.Arguments) 
+                        ExtractMemberAccesses(arg, param, dynQuery);
+                    break;
+                case MemberInitExpression mi:
+                    ExtractMemberAccesses(mi.NewExpression, param, dynQuery);
+                    foreach (var binding in mi.Bindings.OfType<MemberAssignment>())
+                        ExtractMemberAccesses(binding.Expression, param, dynQuery);
+                    break;
+                case UnaryExpression u:
+                    body = u.Operand;
+                    continue;
+                case ConditionalExpression c:
+                    ExtractMemberAccesses(c.IfTrue, param, dynQuery);
+                    body = c.IfFalse;
+                    continue;
+                case BinaryExpression b:
+                    ExtractMemberAccesses(b.Left, param, dynQuery);
+                    body = b.Right;
+                    continue;
+            }
+
+            break;
+        }
+    }
+
     // ── Unsupported ───────────────────────────────────────────────────────
 
     protected override ShapedQueryExpression TranslateAll(ShapedQueryExpression source, LambdaExpression predicate) =>
-        throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateAny(ShapedQueryExpression source, LambdaExpression predicate) =>
-        throw new NotImplementedException();
+        throw new NotSupportedException("All() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateAverage(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType) =>
-        throw new NotImplementedException();
+    ) => throw new NotSupportedException("Average() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateConcat(
         ShapedQueryExpression source,
         ShapedQueryExpression second
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Concat() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item) =>
-        throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateDefaultIfEmpty(
-        ShapedQueryExpression source,
-        Expression defaultValue
-    ) => throw new NotImplementedException();
+        throw new NotSupportedException("Contains() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateDistinct(ShapedQueryExpression source) =>
-        throw new NotImplementedException();
+        throw new NotSupportedException("Distinct() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateElementAtOrDefault(
         ShapedQueryExpression source,
         Expression index,
         bool returnDefault
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("ElementAt() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateExcept(
         ShapedQueryExpression source,
         ShapedQueryExpression second
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Except() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateGroupBy(
         ShapedQueryExpression source,
         LambdaExpression keySelector,
         LambdaExpression elementSelector,
         LambdaExpression resultSelector
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("GroupBy() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateGroupJoin(
         ShapedQueryExpression outer,
@@ -229,12 +325,12 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("GroupJoin() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateIntersect(
         ShapedQueryExpression source,
         ShapedQueryExpression second
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Intersect() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateJoin(
         ShapedQueryExpression outer,
@@ -242,14 +338,7 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateLastOrDefault(
-        ShapedQueryExpression source,
-        LambdaExpression predicate,
-        Type returnType,
-        bool returnDefault
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Join() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateLeftJoin(
         ShapedQueryExpression outer,
@@ -257,60 +346,51 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("LeftJoin() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateMax(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Max() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateMin(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateOfType(ShapedQueryExpression source, Type resultType) =>
-        throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateReverse(ShapedQueryExpression source) =>
-        throw new NotImplementedException();
-
-    protected override ShapedQueryExpression TranslateSelect(ShapedQueryExpression source, LambdaExpression selector) =>
-        source;
+    ) => throw new NotSupportedException("Min() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateSelectMany(
         ShapedQueryExpression source,
         LambdaExpression collectionSelector,
         LambdaExpression resultSelector
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("SelectMany() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateSelectMany(
         ShapedQueryExpression source,
         LambdaExpression selector
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("SelectMany() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateSkipWhile(
         ShapedQueryExpression source,
         LambdaExpression predicate
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("SkipWhile() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateSum(
         ShapedQueryExpression source,
         LambdaExpression selector,
         Type resultType
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Sum() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateTakeWhile(
         ShapedQueryExpression source,
         LambdaExpression predicate
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("TakeWhile() is not supported by the Dynamics 365 provider.");
 
     protected override ShapedQueryExpression TranslateUnion(
         ShapedQueryExpression source,
         ShapedQueryExpression second
-    ) => throw new NotImplementedException();
+    ) => throw new NotSupportedException("Union() is not supported by the Dynamics 365 provider.");
 
     // ── Helpers ───────────────────────────────────────────────────────────
 

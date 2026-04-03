@@ -87,6 +87,19 @@ public sealed class DynamicsQueryExpression : Expression
         SetTop(1);
     }
 
+    /// <summary>Non-null when a Select projection has been applied.</summary>
+    public LambdaExpression? Projection { get; private set; }
+
+    public void SetProjection(LambdaExpression selector) => Projection = selector;
+
+    public void ReverseOrders()
+    {
+        foreach (var order in _sdkQuery.Orders)
+            order.OrderType = order.OrderType == OrderType.Ascending
+                ? OrderType.Descending
+                : OrderType.Ascending;
+    }
+
     // ── SDK query access ──────────────────────────────────────────────────
 
     /// <summary>Returns the fully-built <see cref="QueryExpression"/> ready to send to Dataverse.</summary>

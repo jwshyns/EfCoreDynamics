@@ -368,7 +368,9 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_or()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID).Select(c => new
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
+            .Select(c => new
                 { c.CustomerID, Value = c.CustomerID == NorthwindData.AlfkiId | c.CustomerID == NorthwindData.AnatrId })
             .ToListAsync();
 
@@ -380,7 +382,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_or_multiple()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID)
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
             .Select(c => new
             {
                 c.CustomerID,
@@ -397,7 +400,9 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_and()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID).Select(c => new
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
+            .Select(c => new
                 { c.CustomerID, Value = c.CustomerID == NorthwindData.AlfkiId & c.CustomerID == NorthwindData.AnatrId })
             .ToListAsync();
 
@@ -408,7 +413,8 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_and_or()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID)
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
             .Select(c => new
             {
                 c.CustomerID,
@@ -424,7 +430,9 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_or_with_logical_or()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID).Select(c => new
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
+            .Select(c => new
             {
                 c.CustomerID,
                 Value = c.CustomerID == NorthwindData.AlfkiId | c.CustomerID == NorthwindData.AnatrId ||
@@ -440,7 +448,9 @@ public abstract class AsyncSimpleQueryTestBase<TFixture> : QueryTestBase<TFixtur
     public virtual async Task Select_bitwise_and_with_logical_and()
     {
         await using var context = CreateContext();
-        var query = await context.Customers.OrderBy(c => c.CustomerID).Select(c => new
+        var query = await context.Customers
+            .OrderBy(c => c.CustomerID)
+            .Select(c => new
             {
                 c.CustomerID,
                 Value = c.CustomerID == NorthwindData.AlfkiId & c.CustomerID == NorthwindData.AnatrId &&

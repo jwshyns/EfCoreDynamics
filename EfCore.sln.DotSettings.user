@@ -1,6 +1,7 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AArgumentNullException_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E3_003Fresharper_002Dhost_003FDecompilerCache_003Fdecompiler_003Fb832f0c84d8f4194ba80da6636282d1bd2b10_003F54_003F4f8c3c74_003FArgumentNullException_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AAsyncSimpleQueryTestBase_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2026_002E1_003Fresharper_002Dhost_003FSourcesCache_003F1b30422e4f4020a4b5f9bb458387cecf6daf3cf05c8f646b5dcfc3cee02c7f_003FAsyncSimpleQueryTestBase_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003AConditionalFactAttribute_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2026_002E1_003Fresharper_002Dhost_003FDecompilerCache_003Fdecompiler_003F8f5fe2b682ec4e519317fdd8c6817ac7791b90_003F51_003F56262b2f_003FConditionalFactAttribute_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ACoreTypeMapping_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E3_003Fresharper_002Dhost_003FSourcesCache_003F3117e6cc89d0a4d79296b8fd69a1689a1b9090489aeb513fa5e3994a50c1d32_003FCoreTypeMapping_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ACreateResponse_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2026_002E1_003Fresharper_002Dhost_003FDecompilerCache_003Fdecompiler_003F197701e8634549dfa1d99d45ed48fa51b03f8_003F82_003Ffa5cc0b4_003FCreateResponse_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=7020124F_002D9FFC_002D4AC3_002D8F3D_002DAAB8E0240759_002Ff_003ADatabaseProviderDependencies_002Ecs_002Fl_003AC_0021_003FUsers_003FUser_003FAppData_003FRoaming_003FJetBrains_003FRider2025_002E3_003Fresharper_002Dhost_003FSourcesCache_003F92d8c9f3a7fa94fdd2c53e6bb5b6d7ef4af5642af8665a9ecc9fcdabe0a8a4_003FDatabaseProviderDependencies_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
@@ -61,12 +62,8 @@
 	<s:String x:Key="/Default/Environment/InjectedLayers/FileInjectedLayer/=5E52EA1910D375488130A42782C171C1/RelativePath/@EntryValue">..\..\DotSettings\Jaegersoft.DotSettings</s:String>
 	<s:Boolean x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=File5E52EA1910D375488130A42782C171C1/@KeyIndexDefined">True</s:Boolean>
 	<s:Double x:Key="/Default/Environment/InjectedLayers/InjectedLayerCustomization/=File5E52EA1910D375488130A42782C171C1/RelativePriority/@EntryValue">1</s:Double>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=0c361e07_002Dc411_002D432e_002Dad6f_002D3f894372b153/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Concat_dbset" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;Or&gt;&#xD;
-    &lt;TestAncestor&gt;&#xD;
-      &lt;TestId&gt;xUnit::7770C61E-6A99-0E57-86A2-364EC44C8EDA::net8.0::EfCore.Dynamics.FunctionalTests.AsyncSimpleQueryDynamicsTest.Concat_dbset&lt;/TestId&gt;&#xD;
-    &lt;/TestAncestor&gt;&#xD;
-    &lt;Project Location="X:\User\RiderProjects\EfCore\tests\EfCore.Dynamics365.Tests" Presentation="&amp;lt;EfCore.Dynamics365.Tests&amp;gt;" /&gt;&#xD;
-  &lt;/Or&gt;&#xD;
+	
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=be668871_002D4b01_002D4e10_002Da6ec_002D625d69a558d4/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="All tests from Solution" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Solution /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
 	</wpf:ResourceDictionary>
