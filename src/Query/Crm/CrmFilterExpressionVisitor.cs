@@ -43,6 +43,7 @@ internal sealed class CrmFilterExpressionVisitor
         switch (expr.NodeType)
         {
             case ExpressionType.AndAlso:
+            case ExpressionType.And:
             {
                 var b = (BinaryExpression)expr;
                 var filter = new FilterExpression(LogicalOperator.And);
@@ -52,6 +53,7 @@ internal sealed class CrmFilterExpressionVisitor
             }
 
             case ExpressionType.OrElse:
+            case ExpressionType.Or:
             {
                 var b = (BinaryExpression)expr;
                 var filter = new FilterExpression(LogicalOperator.Or);

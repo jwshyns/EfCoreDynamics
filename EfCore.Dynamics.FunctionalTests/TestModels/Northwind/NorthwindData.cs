@@ -9,9 +9,9 @@ namespace EfCore.Dynamics.FunctionalTests.TestModels.Northwind;
 
 internal sealed partial class NorthwindData : ISetSource
 {
-    public static readonly Guid AlfkiId = new("c72d33cc-bb79-5959-b966-02f1e02d74d3");
-    public static readonly Guid AnatrId = new("e76cf008-3d0b-55f4-85af-737431242370");
-    public static readonly Guid AntonId = new("65ccd6d7-b0e8-550a-9ffd-19c88f0f986c");
+    public static readonly Guid AlfkiId = new("00000000-0000-0000-0000-000000000001");
+    public static readonly Guid AnatrId = new("00000000-0000-0000-0000-000000000002");
+    public static readonly Guid AntonId = new("00000000-0000-0000-0000-000000000003");
 
     private readonly Customer[] _customers;
     private readonly CustomerView[] _customerViews;
