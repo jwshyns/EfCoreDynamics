@@ -6,6 +6,7 @@ using EfCore.Dynamics365.Infrastructure;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace EfCore.Dynamics365.Client;
@@ -30,6 +31,16 @@ internal interface IDynamicsClient
 
     /// <summary>Deletes a record by logical name and primary-key GUID.</summary>
     public Task DeleteAsync(string logicalName, Guid id, CancellationToken cancellationToken = default);
+
+    public Task<ExecuteMultipleResponse> ExecuteMultipleAsync(
+        OrganizationRequestCollection requests,
+        CancellationToken cancellationToken = default
+    );
+
+    public Task<ExecuteTransactionResponse> ExecuteTransactionAsync(
+        OrganizationRequestCollection requests,
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>
@@ -106,4 +117,22 @@ internal sealed class DynamicsClient : IDynamicsClient
     /// <summary>Deletes a record by logical name and primary-key GUID.</summary>
     public Task DeleteAsync(string logicalName, Guid id, CancellationToken cancellationToken = default)
         => _service.DeleteAsync(logicalName, id, cancellationToken);
+
+    public async Task<ExecuteMultipleResponse> ExecuteMultipleAsync(
+        OrganizationRequestCollection requests,
+        CancellationToken cancellationToken = default
+    ) =>
+        (ExecuteMultipleResponse)await _service.ExecuteAsync(
+            new ExecuteMultipleRequest
+                { Requests = requests, Settings = new ExecuteMultipleSettings { ReturnResponses = true } },
+            cancellationToken);
+
+
+    public async Task<ExecuteTransactionResponse> ExecuteTransactionAsync(
+        OrganizationRequestCollection requests,
+        CancellationToken cancellationToken = default
+    ) =>
+        (ExecuteTransactionResponse)await _service.ExecuteAsync(
+            new ExecuteTransactionRequest { Requests = requests, ReturnResponses = true },
+            cancellationToken);
 }

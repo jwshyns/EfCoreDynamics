@@ -5,6 +5,8 @@ using FakeXrmEasy.Middleware.Crud;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
 
 namespace EfCore.Dynamics.FunctionalTests.TestUtilities;
 
@@ -16,11 +18,48 @@ internal sealed class DynamicsTestStore : TestStore
     {
         var fakedContext = MiddlewareBuilder
             .New()
+            // fake transaction/multiple request support
+            .Use(next => (context, request) =>
+            {
+                switch (request)
+                {
+                    case ExecuteTransactionRequest transactionRequest:
+                    {
+                        OrganizationResponseCollection responses = [];
+                        foreach (var req in transactionRequest.Requests)
+                        {
+                            var response = next(context, req);
+                            if (transactionRequest.ReturnResponses is true) responses.Add(response);
+                        }
+
+                        return new ExecuteTransactionResponse
+                        {
+                            Results = [new KeyValuePair<string, object>("Responses", responses)]
+                        };
+                    }
+                    case ExecuteMultipleRequest multipleRequest:
+                    {
+                        OrganizationResponseCollection responses = [];
+                        foreach (var req in multipleRequest.Requests)
+                        {
+                            var response = next(context, req);
+                            if (multipleRequest.Settings.ReturnResponses) responses.Add(response);
+                        }
+
+                        return new ExecuteMultipleResponse
+                        {
+                            Results = [new KeyValuePair<string, object>("Responses", responses)]
+                        };
+                    }
+                    default:
+                        return next(context, request);
+                }
+            })
             .AddCrud()
             .UseCrud()
             .SetLicense(FakeXrmEasyLicense.NonCommercial)
             .Build();
-        
+
         OrganizationServiceAsync2 = fakedContext.GetAsyncOrganizationService2();
     }
 
