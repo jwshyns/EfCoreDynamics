@@ -24,4 +24,8 @@
       <ProjectReference Include="..\EfCore.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="TestModels\" />
+    </ItemGroup>
+
 </Project>
