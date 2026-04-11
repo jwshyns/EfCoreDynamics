@@ -1,12 +1,14 @@
 using System;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using EfCore.Dynamics365.Metadata;
 using EfCore.Dynamics365.Query.Crm;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace EfCore.Dynamics365.Query.Visitors;
 
@@ -69,6 +71,9 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression predicate
     )
     {
+        // for some reason this can be null
+        if (predicate is null) return source;
+        
         var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
         var visitor = new CrmFilterExpressionVisitor(dynQuery.EntityType, predicate.Parameters[0]);
         var filter = visitor.Translate(predicate.Body);
@@ -259,7 +264,7 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
                     break;
                 }
                 case NewExpression ne:
-                    foreach (var arg in ne.Arguments) 
+                    foreach (var arg in ne.Arguments)
                         ExtractMemberAccesses(arg, param, dynQuery);
                     break;
                 case MemberInitExpression mi:
@@ -343,7 +348,7 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => throw new NotSupportedException("Join() is not supported by the Dynamics 365 provider.");
+    ) => ApplyJoin(outer, inner, outerKeySelector, innerKeySelector, resultSelector, JoinOperator.Inner);
 
     protected override ShapedQueryExpression TranslateLeftJoin(
         ShapedQueryExpression outer,
@@ -351,7 +356,91 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
         LambdaExpression outerKeySelector,
         LambdaExpression innerKeySelector,
         LambdaExpression resultSelector
-    ) => throw new NotSupportedException("LeftJoin() is not supported by the Dynamics 365 provider.");
+    ) => ApplyJoin(outer, inner, outerKeySelector, innerKeySelector, resultSelector, JoinOperator.LeftOuter);
+
+    private static ShapedQueryExpression ApplyJoin(
+        ShapedQueryExpression outer,
+        ShapedQueryExpression inner,
+        LambdaExpression outerKeySelector,
+        LambdaExpression innerKeySelector,
+        LambdaExpression resultSelector,
+        JoinOperator joinOperator
+    )
+    {
+        var outerDyn = (DynamicsQueryExpression)outer.QueryExpression;
+        var innerDyn = (DynamicsQueryExpression)inner.QueryExpression;
+
+        var (outerPropName, outerDeclType) = ExtractKeyInfo(outerKeySelector);
+        var (innerPropName, _) = ExtractKeyInfo(innerKeySelector);
+
+        // Identify which entity the outer key property belongs to.
+        var fromEntityType = FindEntityTypeForClrType(outerDyn, outerDeclType)
+                             ?? throw new NotSupportedException(
+                                 $"Cannot resolve entity type for CLR type '{outerDeclType.Name}' in join key selector.");
+
+        var outerKeyAttr = fromEntityType.FindProperty(outerPropName)?.GetAttributeLogicalName()
+                           ?? throw new NotSupportedException(
+                               $"Property '{outerPropName}' not found on entity '{fromEntityType.Name}'.");
+
+        var innerKeyAttr = innerDyn.EntityType.FindProperty(innerPropName)?.GetAttributeLogicalName()
+                           ?? throw new NotSupportedException(
+                               $"Property '{innerPropName}' not found on entity '{innerDyn.EntityType.Name}'.");
+
+        // Root-level join unless the key belongs to an already-linked inner entity.
+        string? parentAlias = null;
+        if (fromEntityType != outerDyn.EntityType)
+            parentAlias = outerDyn.Links.First(l => l.InnerEntityType == fromEntityType).Alias;
+
+        var alias = outerDyn.AddLink(
+            innerDyn.EntityType, innerDyn.EntityLogicalName,
+            outerKeyAttr, innerKeyAttr, joinOperator, parentAlias);
+        outerDyn.SetLinkResultSelector(alias, resultSelector);
+
+        return outer;
+    }
+
+    /// <summary>
+    /// Extracts the property name and the CLR type it is declared on from a key selector.
+    /// Handles simple member access (<c>o =&gt; o.CustomerID</c>), chained member access
+    /// (<c>oc =&gt; oc.o.EmployeeID</c>), and <c>EF.Property&lt;T&gt;(o, "Name")</c>.
+    /// </summary>
+    private static (string propertyName, Type declaringClrType) ExtractKeyInfo(LambdaExpression keySelector)
+    {
+        var body = keySelector.Body;
+        while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+            body = u.Operand;
+
+        // EF.Property<T>(entity, "PropertyName")
+        if (body is MethodCallExpression mc
+            && mc.Method.IsGenericMethod
+            && mc.Method.GetGenericMethodDefinition() == EfPropertyMethod
+            && mc.Arguments.Count == 2
+            && mc.Arguments[1] is ConstantExpression { Value: string efPropName })
+            return (efPropName, mc.Arguments[0].Type);
+
+        // Simple or chained member access: o.Prop or oc.o.Prop
+        // In both cases the declaring type is the type of the direct parent expression.
+        if (body is MemberExpression m)
+            return (m.Member.Name, m.Expression!.Type);
+
+        throw new NotSupportedException(
+            $"Join key selector must be a simple property access or EF.Property call, got: {body}");
+    }
+
+    /// <summary>
+    /// Returns the <see cref="IEntityType"/> whose CLR type matches <paramref name="clrType"/>,
+    /// checking the root entity and all currently-registered links.
+    /// </summary>
+    private static IEntityType? FindEntityTypeForClrType(DynamicsQueryExpression dynQuery, Type clrType)
+    {
+        if (dynQuery.EntityType.ClrType == clrType) return dynQuery.EntityType;
+        foreach (var link in dynQuery.Links)
+            if (link.InnerEntityType.ClrType == clrType) return link.InnerEntityType;
+        return null;
+    }
+
+    private static readonly MethodInfo EfPropertyMethod =
+        typeof(EF).GetMethod(nameof(EF.Property))!.GetGenericMethodDefinition();
 
     protected override ShapedQueryExpression TranslateMax(
         ShapedQueryExpression source,

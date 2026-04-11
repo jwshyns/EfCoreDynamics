@@ -41,6 +41,69 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
         var dynQueryConst = Expression.Constant(dynExpr);
         var entityTypeConst = Expression.Constant(entityType);
 
+        // ── Joined / included query path ──────────────────────────────────
+        if (dynExpr.Links.Count > 0)
+        {
+            var entityParam = Expression.Parameter(typeof(Entity), "entity");
+            Expression transformerBody;
+            Type resultType;
+
+            if (dynExpr.Links.All(IsIncludeLink))
+            {
+                // Include path: materialise root + linked entities, set reference
+                // navigation properties from the EF Core model, return the root entity.
+                // (The result selector returns TransparentIdentifier — bypassed entirely.)
+                (transformerBody, resultType) = BuildIncludeTransformer(
+                    dynExpr, clrType, entityType, entityParam, entityTypeConst);
+            }
+            else
+            {
+                // Regular LINQ Join path: compose result selectors inline (beta-reduction)
+                // so EF Core's outer compilation keeps QueryContext parameters in scope.
+                Expression current = Expression.Call(
+                    MaterialiseMethod.MakeGenericMethod(clrType),
+                    entityParam, entityTypeConst);
+
+                foreach (var link in dynExpr.Links)
+                {
+                    var innerClrType = link.InnerEntityType.ClrType;
+                    var innerMaterialised = Expression.Call(
+                        MaterialiseLinkedMethod.MakeGenericMethod(innerClrType),
+                        entityParam,
+                        Expression.Constant(link.InnerEntityType),
+                        Expression.Constant(link.Alias));
+                    current = InlineLambda(link.ResultSelector!, current, innerMaterialised);
+                }
+
+                transformerBody = current;
+                resultType = current.Type;
+            }
+
+            var funcType = typeof(Func<,>).MakeGenericType(typeof(Entity), resultType);
+            var rowTransformer = Expression.Lambda(funcType, transformerBody, entityParam);
+
+            if (_isAsync)
+            {
+                var executeMethod = typeof(DynamicsQueryExecutor)
+                    .GetMethod(nameof(DynamicsQueryExecutor.ExecuteWithTransformerAsync))!
+                    .MakeGenericMethod(resultType);
+
+                return Expression.Call(null, executeMethod,
+                    queryContextParam, dynQueryConst, rowTransformer,
+                    Expression.Constant(CancellationToken.None));
+            }
+            else
+            {
+                var executeMethod = typeof(DynamicsQueryExecutor)
+                    .GetMethod(nameof(DynamicsQueryExecutor.ExecuteWithTransformer))!
+                    .MakeGenericMethod(resultType);
+
+                return Expression.Call(null, executeMethod,
+                    queryContextParam, dynQueryConst, rowTransformer);
+            }
+        }
+
+        // ── Simple (non-join) path ────────────────────────────────────────
         if (_isAsync)
         {
             var executeMethod = typeof(DynamicsQueryExecutor)
@@ -59,7 +122,8 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                     .GetMethod(nameof(DynamicsQueryExecutor.SelectAsync))!
                     .MakeGenericMethod(clrType, projType);
                 var compiled = CompileProjection(asyncProjection, clrType, projType);
-                result = Expression.Call(null, selectAsyncMethod, result, compiled, Expression.Constant(CancellationToken.None));
+                result = Expression.Call(null, selectAsyncMethod, result, compiled,
+                    Expression.Constant(CancellationToken.None));
             }
 
             return result;
@@ -91,12 +155,132 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
         }
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────
+
     private static Expression CompileProjection(LambdaExpression projection, Type entityType, Type projType)
     {
         var funcType = typeof(Func<,>).MakeGenericType(entityType, projType);
         var typedLambda = Expression.Lambda(funcType, projection.Body, projection.Parameters);
         return Expression.Constant(typedLambda.Compile(), funcType);
     }
+
+    /// <summary>
+    /// Beta-reduces <paramref name="lambda"/> by substituting each parameter with the
+    /// corresponding argument expression. The result is an inlined expression tree with
+    /// no <see cref="InvocationExpression"/> wrapper, so EF Core's outer compilation
+    /// retains full access to <c>QueryContext</c> parameter references.
+    /// </summary>
+    private static Expression InlineLambda(LambdaExpression lambda, params Expression[] args)
+    {
+        var body = lambda.Body;
+        for (var i = 0; i < lambda.Parameters.Count && i < args.Length; i++)
+            body = new ParameterReplacer(lambda.Parameters[i], args[i]).Visit(body);
+        return body;
+    }
+
+    // ── Include helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a row-transformer for a query that uses only Include-style joins.
+    /// Materialises the root entity and every linked entity, assigns each to the
+    /// appropriate reference navigation property (determined from the EF Core model),
+    /// then returns the root entity. The <c>TransparentIdentifier</c> result selectors
+    /// produced by EF Core's navigation expander are ignored entirely.
+    /// </summary>
+    private static (Expression body, Type resultType) BuildIncludeTransformer(
+        DynamicsQueryExpression dynExpr,
+        Type rootClrType,
+        IEntityType rootEntityType,
+        ParameterExpression entityParam,
+        ConstantExpression rootEntityTypeConst
+    )
+    {
+        var allVars = new List<ParameterExpression>();
+        var exprs = new List<Expression>();
+
+        // Root entity variable
+        var rootVar = Expression.Variable(rootClrType, "root");
+        allVars.Add(rootVar);
+        exprs.Add(Expression.Assign(rootVar, Expression.Call(
+            MaterialiseMethod.MakeGenericMethod(rootClrType), entityParam, rootEntityTypeConst)));
+
+        // Materialise all linked entities into named variables
+        var varByAlias = new Dictionary<string, ParameterExpression>();
+        var entityTypeByAlias = new Dictionary<string, IEntityType>();
+
+        foreach (var link in dynExpr.Links)
+        {
+            var innerClrType = link.InnerEntityType.ClrType;
+            var innerVar = Expression.Variable(innerClrType, link.Alias);
+            allVars.Add(innerVar);
+            varByAlias[link.Alias] = innerVar;
+            entityTypeByAlias[link.Alias] = link.InnerEntityType;
+
+            exprs.Add(Expression.Assign(innerVar, Expression.Call(
+                MaterialiseLinkedMethod.MakeGenericMethod(innerClrType),
+                entityParam,
+                Expression.Constant(link.InnerEntityType),
+                Expression.Constant(link.Alias))));
+        }
+
+        // Assign navigation properties (after all entities are materialised)
+        foreach (var link in dynExpr.Links)
+        {
+            var parentVar = link.ParentAlias == null ? rootVar : varByAlias[link.ParentAlias];
+            var parentEntityType = link.ParentAlias == null
+                ? rootEntityType
+                : entityTypeByAlias[link.ParentAlias];
+
+            var nav = parentEntityType.GetNavigations()
+                .FirstOrDefault(n => IsReferenceNavigation(n) && n.GetTargetType() == link.InnerEntityType);
+
+            if (nav?.PropertyInfo != null)
+                exprs.Add(Expression.Assign(
+                    Expression.Property(parentVar, nav.PropertyInfo),
+                    varByAlias[link.Alias]));
+        }
+
+        exprs.Add(rootVar);
+        return (Expression.Block(allVars, exprs), rootClrType);
+    }
+
+    private static bool IsIncludeLink(LinkInfo link)
+        => link.ResultSelector == null || IsTransparentIdentifierType(link.ResultSelector.ReturnType);
+
+    private static bool IsTransparentIdentifierType(Type type)
+        => type.IsGenericType && type.Name.StartsWith("TransparentIdentifier", StringComparison.Ordinal);
+
+    private static bool IsReferenceNavigation(INavigation nav)
+    {
+        var propType = nav.PropertyInfo?.PropertyType;
+        if (propType == null || propType == typeof(string)) return true;
+        return !typeof(System.Collections.IEnumerable).IsAssignableFrom(propType);
+    }
+
+    private sealed class ParameterReplacer : ExpressionVisitor
+    {
+        private readonly ParameterExpression _param;
+        private readonly Expression _replacement;
+
+        public ParameterReplacer(ParameterExpression param, Expression replacement)
+        {
+            _param = param;
+            _replacement = replacement;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+            => ReferenceEquals(node, _param) ? _replacement : base.VisitParameter(node);
+    }
+
+    // ── Cached MethodInfo for Materialise / MaterialiseLinked ─────────────
+
+    private static readonly MethodInfo MaterialiseMethod =
+        typeof(DynamicsQueryExecutor)
+            .GetMethod(nameof(DynamicsQueryExecutor.Materialise), BindingFlags.Public | BindingFlags.Static)!;
+
+    private static readonly MethodInfo MaterialiseLinkedMethod =
+        typeof(DynamicsQueryExecutor)
+            .GetMethod(nameof(DynamicsQueryExecutor.MaterialiseLinked), BindingFlags.Public | BindingFlags.Static)!;
 }
 
 /// <summary>
@@ -150,9 +334,63 @@ public static class DynamicsQueryExecutor
             yield return Materialise<T>(e, entityType);
     }
 
+    // ── Join execution ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Executes a query that has one or more <see cref="LinkInfo"/> joins and maps each
+    /// result row through <paramref name="rowTransformer"/> to produce the final result.
+    /// </summary>
+    public static IEnumerable<TResult> ExecuteWithTransformer<TResult>(
+        QueryContext queryContext,
+        DynamicsQueryExpression query,
+        Func<Entity, TResult> rowTransformer
+    )
+    {
+        var ctx = (DynamicsQueryContext)queryContext;
+        var sdkQuery = query.BuildQueryExpression();
+        IEnumerable<Entity> rows = ctx.Client
+            .QueryAsync(query.EntityLogicalName, sdkQuery)
+            .GetAwaiter().GetResult();
+
+        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
+            rows = rows.Skip(skip);
+        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
+            rows = rows.Take(top);
+
+        return rows.Select(rowTransformer);
+    }
+
+    /// <inheritdoc cref="ExecuteWithTransformer{TResult}"/>
+    public static async IAsyncEnumerable<TResult> ExecuteWithTransformerAsync<TResult>(
+        QueryContext queryContext,
+        DynamicsQueryExpression query,
+        Func<Entity, TResult> rowTransformer,
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
+    {
+        var ctx = (DynamicsQueryContext)queryContext;
+        var sdkQuery = query.BuildQueryExpression();
+
+        IEnumerable<Entity> rows = await ctx.Client
+            .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
+            rows = rows.Skip(skip);
+        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
+            rows = rows.Take(top);
+
+        foreach (var e in rows)
+            yield return rowTransformer(e);
+    }
+
     // ── Materialisation ───────────────────────────────────────────────────
 
-    private static T Materialise<T>(Entity entity, IEntityType entityType)
+    /// <summary>
+    /// Materialises the root entity from a Dataverse <see cref="Entity"/> row.
+    /// Called from compiled row-transformer expressions.
+    /// </summary>
+    public static T Materialise<T>(Entity entity, IEntityType entityType)
         where T : class
     {
         var instance = Activator.CreateInstance<T>();
@@ -166,13 +404,48 @@ public static class DynamicsQueryExecutor
                 continue;
             }
 
-            var logicalName = prop.GetAttributeLogicalName() ?? prop.Name.ToLowerInvariant();
+            var logicalName = prop.GetAttributeLogicalName();
 
             if (!entity.Contains(logicalName)) continue;
 
             try
             {
                 var clrValue = ConvertValue(entity[logicalName], prop.ClrType);
+                prop.PropertyInfo?.SetValue(instance, clrValue);
+            }
+            catch
+            {
+                // Skip attributes that cannot be mapped to the CLR property.
+            }
+        }
+
+        return instance;
+    }
+
+    /// <summary>
+    /// Materialises a linked (joined) entity from <see cref="AliasedValue"/> attributes
+    /// stored under <c>{alias}.{attributeName}</c> keys in a Dataverse result row.
+    /// Returns a default instance when none of the aliased attributes are present
+    /// (left-outer-join rows where the inner entity has no match).
+    /// Called from compiled row-transformer expressions.
+    /// </summary>
+    public static TInner MaterialiseLinked<TInner>(Entity entity, IEntityType entityType, string alias)
+        where TInner : class
+    {
+        var prefix = alias + ".";
+        var instance = Activator.CreateInstance<TInner>();
+
+        foreach (var prop in entityType.GetProperties())
+        {
+            var logicalName = prop.GetAttributeLogicalName();
+            var aliasedKey = prefix + logicalName;
+
+            if (!entity.Contains(aliasedKey)) continue;
+
+            try
+            {
+                var rawValue = entity[aliasedKey] is AliasedValue av ? av.Value : entity[aliasedKey];
+                var clrValue = ConvertValue(rawValue, prop.ClrType);
                 prop.PropertyInfo?.SetValue(instance, clrValue);
             }
             catch
@@ -192,7 +465,6 @@ public static class DynamicsQueryExecutor
     {
         if (rawValue is null) return null;
 
-        // Unwrap Dataverse SDK wrappers
         rawValue = rawValue switch
         {
             Money m => m.Value,

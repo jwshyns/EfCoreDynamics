@@ -1,9 +1,61 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace EfCore.Dynamics365.Query;
+
+/// <summary>
+/// Describes one <see cref="LinkEntity"/> join that has been added to the query.
+/// <para>
+/// A root-level link (<see cref="ParentAlias"/> is <c>null</c>) is added directly to
+/// <see cref="QueryExpression.LinkEntities"/>. A nested link is added to the
+/// <see cref="LinkEntity.LinkEntities"/> of its parent, enabling <c>ThenInclude</c>-style
+/// chains where the join is made from an inner entity rather than the root entity.
+/// </para>
+/// </summary>
+public sealed class LinkInfo
+{
+    public IEntityType InnerEntityType { get; }
+    public string InnerEntityLogicalName { get; }
+    public string OuterKeyAttribute { get; }
+    public string InnerKeyAttribute { get; }
+
+    /// <summary>Alias assigned to the linked entity, e.g. <c>"customer0"</c>.</summary>
+    public string Alias { get; }
+
+    /// <summary>
+    /// Alias of the parent <see cref="LinkInfo"/> under which this link is nested, or
+    /// <c>null</c> if the link is at the root level.
+    /// </summary>
+    public string? ParentAlias { get; }
+
+    /// <summary>
+    /// The result-selector lambda that combines the current accumulated result with
+    /// this link's inner entity to produce the next accumulated result.
+    /// Set by <see cref="DynamicsQueryExpression.SetLinkResultSelector"/>.
+    /// </summary>
+    public LambdaExpression? ResultSelector { get; internal set; }
+
+    public LinkInfo(
+        IEntityType innerEntityType,
+        string innerEntityLogicalName,
+        string outerKeyAttribute,
+        string innerKeyAttribute,
+        string alias,
+        string? parentAlias
+    )
+    {
+        InnerEntityType = innerEntityType;
+        InnerEntityLogicalName = innerEntityLogicalName;
+        OuterKeyAttribute = outerKeyAttribute;
+        InnerKeyAttribute = innerKeyAttribute;
+        Alias = alias;
+        ParentAlias = parentAlias;
+    }
+}
 
 /// <summary>
 /// Intermediate representation of a Dataverse query accumulated during
@@ -13,6 +65,7 @@ namespace EfCore.Dynamics365.Query;
 public sealed class DynamicsQueryExpression : Expression
 {
     private readonly QueryExpression _sdkQuery;
+    private readonly List<LinkInfo> _links = new List<LinkInfo>();
 
     public IEntityType EntityType { get; }
 
@@ -30,6 +83,14 @@ public sealed class DynamicsQueryExpression : Expression
 
     /// <summary>Name of the QueryContext parameter holding the top/take value, when it is not a compile-time constant.</summary>
     public string? TopParameterName { get; private set; }
+
+    /// <summary>
+    /// All joins that have been added to this query, in the order they were added.
+    /// Each <see cref="LinkInfo"/> describes one <see cref="LinkEntity"/> and, for
+    /// LINQ-join queries, the result selector that combines the accumulated result with
+    /// the inner entity.
+    /// </summary>
+    public IReadOnlyList<LinkInfo> Links => _links;
 
     // EF Core expression infrastructure
     public override ExpressionType NodeType => ExpressionType.Extension;
@@ -92,6 +153,72 @@ public sealed class DynamicsQueryExpression : Expression
 
     public void SetProjection(LambdaExpression selector) => Projection = selector;
 
+    /// <summary>
+    /// Adds a join to the query and wires the corresponding <see cref="LinkEntity"/>
+    /// into the underlying <see cref="QueryExpression"/>.
+    /// </summary>
+    /// <param name="innerEntityType">EF Core entity type of the entity being joined to.</param>
+    /// <param name="innerEntityLogicalName">Dataverse logical name of that entity.</param>
+    /// <param name="outerKeyAttribute">Attribute on the <em>from</em> entity used as the join key.</param>
+    /// <param name="innerKeyAttribute">Attribute on the <em>to</em> entity used as the join key.</param>
+    /// <param name="joinOperator">Inner or left-outer.</param>
+    /// <param name="parentAlias">
+    /// Alias of the existing <see cref="LinkInfo"/> under which this link should be nested,
+    /// or <c>null</c> to add the link at the root level.
+    /// </param>
+    /// <returns>The alias assigned to the new link entity (e.g. <c>"customer0"</c>).</returns>
+    public string AddLink(
+        IEntityType innerEntityType,
+        string innerEntityLogicalName,
+        string outerKeyAttribute,
+        string innerKeyAttribute,
+        JoinOperator joinOperator,
+        string? parentAlias = null
+    )
+    {
+        var alias = $"{innerEntityLogicalName}{_links.Count}";
+
+        string linkFromEntityName;
+        if (parentAlias == null)
+        {
+            linkFromEntityName = EntityLogicalName;
+        }
+        else
+        {
+            var parentInfo = _links.First(l => l.Alias == parentAlias);
+            linkFromEntityName = parentInfo.InnerEntityLogicalName;
+        }
+
+        var linkEntity = new LinkEntity
+        {
+            LinkFromEntityName = linkFromEntityName,
+            LinkFromAttributeName = outerKeyAttribute,
+            LinkToEntityName = innerEntityLogicalName,
+            LinkToAttributeName = innerKeyAttribute,
+            JoinOperator = joinOperator,
+            EntityAlias = alias,
+            Columns = new ColumnSet(true),
+        };
+
+        if (parentAlias == null)
+            _sdkQuery.LinkEntities.Add(linkEntity);
+        else
+            FindSdkLinkEntity(_sdkQuery.LinkEntities, parentAlias)!.LinkEntities.Add(linkEntity);
+
+        _links.Add(new LinkInfo(innerEntityType, innerEntityLogicalName, outerKeyAttribute, innerKeyAttribute, alias, parentAlias));
+        return alias;
+    }
+
+    /// <summary>
+    /// Stores the result selector lambda on the link identified by <paramref name="alias"/>.
+    /// </summary>
+    public void SetLinkResultSelector(string alias, LambdaExpression selector)
+    {
+        var link = _links.FirstOrDefault(l => l.Alias == alias)
+                   ?? throw new InvalidOperationException($"No link with alias '{alias}' found.");
+        link.ResultSelector = selector;
+    }
+
     public void ReverseOrders()
     {
         foreach (var order in _sdkQuery.Orders)
@@ -106,4 +233,17 @@ public sealed class DynamicsQueryExpression : Expression
     public QueryExpression BuildQueryExpression() => _sdkQuery;
 
     protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private static LinkEntity? FindSdkLinkEntity(IEnumerable<LinkEntity> links, string alias)
+    {
+        foreach (var link in links)
+        {
+            if (link.EntityAlias == alias) return link;
+            var found = FindSdkLinkEntity(link.LinkEntities, alias);
+            if (found != null) return found;
+        }
+        return null;
+    }
 }
