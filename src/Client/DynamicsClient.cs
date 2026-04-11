@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using EfCore.Dynamics365.Infrastructure;
@@ -13,12 +14,13 @@ namespace EfCore.Dynamics365.Client;
 
 internal interface IDynamicsClient
 {
+    public List<Entity> Query(QueryExpression query);
+    
     /// <summary>
     /// Executes the query and returns all matching records, walking pages
     /// automatically when <see cref="QueryExpression.TopCount"/> is not set.
     /// </summary>
-    public Task<IList<Entity>> QueryAsync(
-        string logicalName,
+    public IAsyncEnumerable<DataCollection<Entity>> QueryAsync(
         QueryExpression query,
         CancellationToken cancellationToken = default
     );
@@ -55,30 +57,44 @@ internal sealed class DynamicsClient : IDynamicsClient
     {
         _service = dbContextOptions.FindExtension<DynamicsOptionsExtension>().OrganisationServiceAsync2!;
     }
+    
+    public List<Entity> Query(QueryExpression query)
+    {
+        // Walk pages until exhausted.
+        var pageNumber = 1;
+        string? pagingCookie = null;
+        List<Entity> entities = [];
+
+        while (true)
+        {
+            query.PageInfo = new PagingInfo
+            {
+                Count = 5000,
+                PageNumber = pageNumber,
+                PagingCookie = pagingCookie
+            };
+
+            var page = _service.RetrieveMultiple(query);
+            entities.AddRange(page.Entities);
+
+            if (!page.MoreRecords) break;
+
+            pageNumber++;
+            pagingCookie = page.PagingCookie;
+        }
+
+        return entities;
+    }
 
     /// <summary>
     /// Executes the query and returns all matching records, walking pages
     /// automatically when <see cref="QueryExpression.TopCount"/> is not set.
     /// </summary>
-    public async Task<IList<Entity>> QueryAsync(
-        string logicalName,
+    public async IAsyncEnumerable<DataCollection<Entity>> QueryAsync(
         QueryExpression query,
-        CancellationToken cancellationToken = default
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
-        query.EntityName = logicalName;
-        var results = new List<Entity>();
-
-        if (query.TopCount.HasValue)
-        {
-            // Single bounded fetch — no paging needed.
-            var single = await _service
-                .RetrieveMultipleAsync(query, cancellationToken)
-                .ConfigureAwait(false);
-            results.AddRange(single.Entities);
-            return results;
-        }
-
         // Walk pages until exhausted.
         var pageNumber = 1;
         string? pagingCookie = null;
@@ -89,21 +105,20 @@ internal sealed class DynamicsClient : IDynamicsClient
             {
                 Count = 5000,
                 PageNumber = pageNumber,
-                PagingCookie = pagingCookie,
+                PagingCookie = pagingCookie
             };
 
             var page = await _service
                 .RetrieveMultipleAsync(query, cancellationToken)
                 .ConfigureAwait(false);
-            results.AddRange(page.Entities);
+
+            yield return page.Entities;
 
             if (!page.MoreRecords) break;
 
             pageNumber++;
             pagingCookie = page.PagingCookie;
         }
-
-        return results;
     }
 
     /// <summary>Creates a record and returns its new primary-key GUID.</summary>

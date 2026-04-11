@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using EfCore.Dynamics365.Tests.Fixtures;
 using EfCore.Dynamics365.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,42 @@ namespace EfCore.Dynamics365.Tests.Integration;
 
 public class QueryTests
 {
+    [Fact]
+    public async Task Include_includes()
+    {
+        var contact = new Contact
+        {
+            ContactId = Guid.NewGuid(),
+            FirstName = "John",
+            LastName = "Smith"
+        };
+
+        var account = new Account
+        {
+            AccountId = Guid.NewGuid(),
+            Name = "Acme",
+            ContactId = contact.ContactId
+        };
+
+        var xrmCtx = Util.BuildContext();
+        xrmCtx.Initialize([contact, account]);
+        await using var ctx = EfCoreXrmTestHelper.CreateContext(xrmCtx.GetAsyncOrganizationService2());
+
+        var result = await ctx.Accounts.Include(x => x.Contact).ToListAsync();
+
+        result
+            .Should()
+            .BeEquivalentTo([
+                new Account
+                {
+                    AccountId = account.AccountId,
+                    Name = account.Name,
+                    ContactId = contact.ContactId,
+                    Contact = contact
+                }
+            ]);
+    }
+
     // ── ToList / basic materialisation ────────────────────────────────────
 
     [Fact]

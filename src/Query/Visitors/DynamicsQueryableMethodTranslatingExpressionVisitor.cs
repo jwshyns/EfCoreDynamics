@@ -19,15 +19,13 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
 {
     private readonly IModel _model;
     private readonly QueryableMethodTranslatingExpressionVisitorDependencies _dependencies;
+    private readonly bool _subquery;
 
     public DynamicsQueryableMethodTranslatingExpressionVisitor(
         QueryableMethodTranslatingExpressionVisitorDependencies dependencies,
         IModel model
-    )
-        : base(dependencies, subquery: false)
+    ) : this(dependencies, model, false)
     {
-        _dependencies = dependencies;
-        _model = model;
     }
 
     private DynamicsQueryableMethodTranslatingExpressionVisitor(
@@ -39,26 +37,27 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
     {
         _dependencies = dependencies;
         _model = model;
+        _subquery = subquery;
     }
 
     protected override QueryableMethodTranslatingExpressionVisitor CreateSubqueryVisitor()
-        => new DynamicsQueryableMethodTranslatingExpressionVisitor(_dependencies, _model, subquery: true);
+        => new DynamicsQueryableMethodTranslatingExpressionVisitor(_dependencies, _model, true);
 
     // ── Entry point ───────────────────────────────────────────────────────
 
     protected override ShapedQueryExpression CreateShapedQueryExpression(Type elementType)
     {
-        var entityType = _model.GetEntityTypes().FirstOrDefault(e => e.ClrType == elementType)
-                         ?? throw new InvalidOperationException(
-                             $"Entity type {elementType.Name} is not registered in the model.");
+        var entityType = _model.FindEntityType(elementType);
 
         var entityLogicalName = entityType.GetEntityLogicalName();
 
         var queryExpr = new DynamicsQueryExpression(entityType, entityLogicalName);
+
         var shaperExpr = new EntityShaperExpression(
             entityType,
             new ProjectionBindingExpression(queryExpr, new ProjectionMember(), typeof(ValueBuffer)),
-            nullable: false);
+            nullable: false
+        );
 
         return new ShapedQueryExpression(queryExpr, shaperExpr);
     }
@@ -434,7 +433,8 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
     {
         if (dynQuery.EntityType.ClrType == clrType) return dynQuery.EntityType;
         foreach (var link in dynQuery.Links)
-            if (link.InnerEntityType.ClrType == clrType) return link.InnerEntityType;
+            if (link.InnerEntityType.ClrType == clrType)
+                return link.InnerEntityType;
         return null;
     }
 

@@ -33,6 +33,10 @@ public class TestCrmContext : DbContext
 
             b.Property(a => a.EMailAddress1)
                 .HasAttributeLogicalName("emailaddress1");
+
+            b.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.AccountId);
         });
 
         modelBuilder.Entity<Contact>(b =>

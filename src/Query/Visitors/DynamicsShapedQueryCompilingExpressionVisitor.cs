@@ -54,7 +54,12 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                 // navigation properties from the EF Core model, return the root entity.
                 // (The result selector returns TransparentIdentifier — bypassed entirely.)
                 (transformerBody, resultType) = BuildIncludeTransformer(
-                    dynExpr, clrType, entityType, entityParam, entityTypeConst);
+                    dynExpr,
+                    clrType,
+                    entityType,
+                    entityParam,
+                    entityTypeConst
+                );
             }
             else
             {
@@ -62,16 +67,20 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                 // so EF Core's outer compilation keeps QueryContext parameters in scope.
                 Expression current = Expression.Call(
                     MaterialiseMethod.MakeGenericMethod(clrType),
-                    entityParam, entityTypeConst);
+                    entityParam, entityTypeConst
+                );
 
                 foreach (var link in dynExpr.Links)
                 {
                     var innerClrType = link.InnerEntityType.ClrType;
+
                     var innerMaterialised = Expression.Call(
                         MaterialiseLinkedMethod.MakeGenericMethod(innerClrType),
                         entityParam,
                         Expression.Constant(link.InnerEntityType),
-                        Expression.Constant(link.Alias));
+                        Expression.Constant(link.Alias)
+                    );
+
                     current = InlineLambda(link.ResultSelector!, current, innerMaterialised);
                 }
 
@@ -88,9 +97,14 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                     .GetMethod(nameof(DynamicsQueryExecutor.ExecuteWithTransformerAsync))!
                     .MakeGenericMethod(resultType);
 
-                return Expression.Call(null, executeMethod,
-                    queryContextParam, dynQueryConst, rowTransformer,
-                    Expression.Constant(CancellationToken.None));
+                return Expression.Call(
+                    null,
+                    executeMethod,
+                    queryContextParam,
+                    dynQueryConst,
+                    rowTransformer,
+                    Expression.Constant(CancellationToken.None) // TODO: figure out how to add cancellation support
+                );
             }
             else
             {
@@ -98,8 +112,13 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
                     .GetMethod(nameof(DynamicsQueryExecutor.ExecuteWithTransformer))!
                     .MakeGenericMethod(resultType);
 
-                return Expression.Call(null, executeMethod,
-                    queryContextParam, dynQueryConst, rowTransformer);
+                return Expression.Call(
+                    null,
+                    executeMethod,
+                    queryContextParam,
+                    dynQueryConst,
+                    rowTransformer
+                );
             }
         }
 
@@ -118,12 +137,20 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
             if (dynExpr.Projection is { } asyncProjection)
             {
                 var projType = asyncProjection.ReturnType;
+
                 var selectAsyncMethod = typeof(DynamicsQueryExecutor)
                     .GetMethod(nameof(DynamicsQueryExecutor.SelectAsync))!
                     .MakeGenericMethod(clrType, projType);
+
                 var compiled = CompileProjection(asyncProjection, clrType, projType);
-                result = Expression.Call(null, selectAsyncMethod, result, compiled,
-                    Expression.Constant(CancellationToken.None));
+
+                result = Expression.Call(
+                    null,
+                    selectAsyncMethod,
+                    result,
+                    compiled,
+                    Expression.Constant(CancellationToken.None) // TODO: figure out how to add cancellation support
+                );
             }
 
             return result;
@@ -141,13 +168,16 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
             if (dynExpr.Projection is { } projection)
             {
                 var projType = projection.ReturnType;
+
                 var selectMethod = typeof(Enumerable)
                     .GetMethods(BindingFlags.Public | BindingFlags.Static)
                     .First(m => m.Name == nameof(Enumerable.Select)
                                 && m.GetParameters().Length == 2
                                 && m.GetParameters()[1].ParameterType.GetGenericArguments().Length == 2)
                     .MakeGenericMethod(clrType, projType);
+
                 var compiled = CompileProjection(projection, clrType, projType);
+
                 result = Expression.Call(null, selectMethod, result, compiled);
             }
 
@@ -216,11 +246,16 @@ internal sealed class DynamicsShapedQueryCompilingExpressionVisitor : ShapedQuer
             varByAlias[link.Alias] = innerVar;
             entityTypeByAlias[link.Alias] = link.InnerEntityType;
 
-            exprs.Add(Expression.Assign(innerVar, Expression.Call(
-                MaterialiseLinkedMethod.MakeGenericMethod(innerClrType),
-                entityParam,
-                Expression.Constant(link.InnerEntityType),
-                Expression.Constant(link.Alias))));
+            exprs.Add(Expression.Assign(
+                    innerVar,
+                    Expression.Call(
+                        MaterialiseLinkedMethod.MakeGenericMethod(innerClrType),
+                        entityParam,
+                        Expression.Constant(link.InnerEntityType),
+                        Expression.Constant(link.Alias)
+                    )
+                )
+            );
         }
 
         // Assign navigation properties (after all entities are materialised)
@@ -298,14 +333,7 @@ public static class DynamicsQueryExecutor
     {
         var ctx = (DynamicsQueryContext)queryContext;
         var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
-        IEnumerable<Entity> rows = ctx.Client
-            .QueryAsync(query.EntityLogicalName, sdkQuery)
-            .GetAwaiter().GetResult();
-
-        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
-            rows = rows.Skip(skip);
-        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
-            rows = rows.Take(top);
+        var rows = ctx.Client.Query(sdkQuery);
 
         return rows.Select(e => Materialise<T>(e, entityType));
     }
@@ -321,17 +349,13 @@ public static class DynamicsQueryExecutor
         var ctx = (DynamicsQueryContext)queryContext;
         var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
 
-        IEnumerable<Entity> rows = await ctx.Client
-            .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)
+        var rows = ctx.Client
+            .QueryAsync(sdkQuery, cancellationToken)
             .ConfigureAwait(false);
 
-        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
-            rows = rows.Skip(skip);
-        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
-            rows = rows.Take(top);
-
-        foreach (var e in rows)
-            yield return Materialise<T>(e, entityType);
+        await foreach (var entities in rows)
+        foreach (var entity in entities)
+            yield return Materialise<T>(entity, entityType);
     }
 
     // ── Join execution ────────────────────────────────────────────────────
@@ -348,14 +372,7 @@ public static class DynamicsQueryExecutor
     {
         var ctx = (DynamicsQueryContext)queryContext;
         var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
-        IEnumerable<Entity> rows = ctx.Client
-            .QueryAsync(query.EntityLogicalName, sdkQuery)
-            .GetAwaiter().GetResult();
-
-        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
-            rows = rows.Skip(skip);
-        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
-            rows = rows.Take(top);
+        var rows = ctx.Client.Query(sdkQuery);
 
         return rows.Select(rowTransformer);
     }
@@ -371,17 +388,13 @@ public static class DynamicsQueryExecutor
         var ctx = (DynamicsQueryContext)queryContext;
         var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
 
-        IEnumerable<Entity> rows = await ctx.Client
-            .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)
+        var rows = ctx.Client
+            .QueryAsync(sdkQuery, cancellationToken)
             .ConfigureAwait(false);
 
-        if (ResolveCount(query.Skip, query.SkipParameterName, queryContext) is { } skip)
-            rows = rows.Skip(skip);
-        if (ResolveCount(null, query.TopParameterName, queryContext) is { } top)
-            rows = rows.Take(top);
-
-        foreach (var e in rows)
-            yield return rowTransformer(e);
+        await foreach (var entities in rows)
+        foreach (var entity in entities)
+            yield return rowTransformer(entity);
     }
 
     // ── Materialisation ───────────────────────────────────────────────────
@@ -488,7 +501,8 @@ public static class DynamicsQueryExecutor
     public static async IAsyncEnumerable<TResult> SelectAsync<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, TResult> selector,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
         await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
             yield return selector(item);

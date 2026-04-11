@@ -30,17 +30,27 @@ public static class EfCoreXrmTestHelper
         Guid id,
         string name,
         decimal? revenue = null,
-        int? numberOfEmployees = null)
+        int? numberOfEmployees = null,
+        Guid? contactId = null
+    )
     {
         var e = new Entity("account", id);
         e.Attributes["accountid"] = id;
         e.Attributes["name"] = name;
-        if (revenue.HasValue)
-            e.Attributes["revenue"] = revenue.Value;
-        if (numberOfEmployees.HasValue)
-            e.Attributes["numberofemployees"] = numberOfEmployees.Value;
+        if (revenue.HasValue) e.Attributes["revenue"] = revenue.Value;
+        if (numberOfEmployees.HasValue) e.Attributes["numberofemployees"] = numberOfEmployees.Value;
+        if (contactId.HasValue) e.Attributes["contactid"] = contactId.Value;
         return e;
     }
+
+    public static Entity AccountEntity(Account account) => AccountEntity
+    (
+        account.AccountId,
+        account.Name,
+        account.Revenue,
+        account.NumberOfEmployees,
+        account.ContactId
+    );
 
     public static Entity ContactEntity(Guid id, string firstName, string lastName)
     {
@@ -50,6 +60,13 @@ public static class EfCoreXrmTestHelper
         e.Attributes["lastname"] = lastName;
         return e;
     }
+    
+    public static Entity ContactEntity(Contact contact) => ContactEntity
+    (
+        contact.ContactId,
+        contact.FirstName,
+        contact.LastName
+    );
 
     /// <summary>
     /// Retrieves all records of a given logical name from the fake context
