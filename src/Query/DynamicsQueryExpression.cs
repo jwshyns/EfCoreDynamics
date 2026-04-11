@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using EfCore.Dynamics365.Query.Crm;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace EfCore.Dynamics365.Query;
@@ -65,7 +67,8 @@ public sealed class LinkInfo
 public sealed class DynamicsQueryExpression : Expression
 {
     private readonly QueryExpression _sdkQuery;
-    private readonly List<LinkInfo> _links = new List<LinkInfo>();
+    private readonly List<LinkInfo> _links = [];
+    private readonly List<(Expression body, ParameterExpression entityParam)> _predicates = [];
 
     public IEntityType EntityType { get; }
 
@@ -110,10 +113,11 @@ public sealed class DynamicsQueryExpression : Expression
 
     // ── Mutation helpers (called by translation visitors) ──────────────────
 
-    public void AddFilter(FilterExpression filter)
-    {
-        _sdkQuery.Criteria.AddFilter(filter);
-    }
+    /// <summary>
+    /// Stores a raw predicate expression to be translated at execution time,
+    /// after EF Core query-parameter values have been resolved.
+    /// </summary>
+    public void AddPredicate(Expression body, ParameterExpression entityParam) => _predicates.Add((body, entityParam));
 
     public void AddSelectField(string logicalName)
     {
@@ -205,7 +209,8 @@ public sealed class DynamicsQueryExpression : Expression
         else
             FindSdkLinkEntity(_sdkQuery.LinkEntities, parentAlias)!.LinkEntities.Add(linkEntity);
 
-        _links.Add(new LinkInfo(innerEntityType, innerEntityLogicalName, outerKeyAttribute, innerKeyAttribute, alias, parentAlias));
+        _links.Add(new LinkInfo(innerEntityType, innerEntityLogicalName, outerKeyAttribute, innerKeyAttribute, alias,
+            parentAlias));
         return alias;
     }
 
@@ -229,8 +234,27 @@ public sealed class DynamicsQueryExpression : Expression
 
     // ── SDK query access ──────────────────────────────────────────────────
 
-    /// <summary>Returns the fully-built <see cref="QueryExpression"/> ready to send to Dataverse.</summary>
-    public QueryExpression BuildQueryExpression() => _sdkQuery;
+    /// <summary>
+    /// Builds and returns the <see cref="QueryExpression"/> ready to send to Dataverse.
+    /// Predicates stored via <see cref="AddPredicate"/> are translated here, after
+    /// EF Core query-parameter values have been resolved from <paramref name="parameterValues"/>.
+    /// </summary>
+    public QueryExpression BuildQueryExpression(IReadOnlyDictionary<string, object> parameterValues)
+    {
+        // Rebuild criteria fresh on every execution so the same compiled query
+        // instance can be called multiple times with different parameter values.
+        _sdkQuery.Criteria = new FilterExpression(LogicalOperator.And);
+
+        foreach (var (body, entityParam) in _predicates)
+        {
+            var resolvedBody = new ParameterResolvingVisitor(parameterValues).Visit(body);
+            var filterVisitor = new CrmFilterExpressionVisitor(EntityType, entityParam);
+            var filter = filterVisitor.Translate(resolvedBody);
+            _sdkQuery.Criteria.AddFilter(filter);
+        }
+
+        return _sdkQuery;
+    }
 
     protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
 
@@ -244,6 +268,38 @@ public sealed class DynamicsQueryExpression : Expression
             var found = FindSdkLinkEntity(link.LinkEntities, alias);
             if (found != null) return found;
         }
+
         return null;
+    }
+
+    /// <summary>
+    /// Replaces EF Core's <c>queryContext.GetParameterValue("name")</c> call expressions
+    /// with <see cref="ConstantExpression"/> nodes whose values come from
+    /// <paramref name="parameterValues"/> at execution time.
+    /// </summary>
+    private sealed class ParameterResolvingVisitor : ExpressionVisitor
+    {
+        private readonly IReadOnlyDictionary<string, object> _parameterValues;
+
+        public ParameterResolvingVisitor(IReadOnlyDictionary<string, object> parameterValues)
+            => _parameterValues = parameterValues;
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            // Match: queryContext.ParameterValues["paramName"]
+            // EF Core generates this as a dictionary indexer call.
+            if (node.Method.Name == "get_Item"
+                && node.Arguments.Count == 1
+                && node.Arguments[0] is ConstantExpression { Value: string paramName }
+                && node.Object is MemberExpression
+                {
+                    Member.Name: "ParameterValues", Expression: ParameterExpression { Type: var ownerType }
+                }
+                && typeof(QueryContext).IsAssignableFrom(ownerType)
+                && _parameterValues.TryGetValue(paramName, out var value))
+                return Constant(value, node.Type);
+
+            return base.VisitMethodCall(node);
+        }
     }
 }

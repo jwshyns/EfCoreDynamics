@@ -297,7 +297,7 @@ public static class DynamicsQueryExecutor
         where T : class
     {
         var ctx = (DynamicsQueryContext)queryContext;
-        var sdkQuery = query.BuildQueryExpression();
+        var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
         IEnumerable<Entity> rows = ctx.Client
             .QueryAsync(query.EntityLogicalName, sdkQuery)
             .GetAwaiter().GetResult();
@@ -319,7 +319,7 @@ public static class DynamicsQueryExecutor
         where T : class
     {
         var ctx = (DynamicsQueryContext)queryContext;
-        var sdkQuery = query.BuildQueryExpression();
+        var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
 
         IEnumerable<Entity> rows = await ctx.Client
             .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)
@@ -347,7 +347,7 @@ public static class DynamicsQueryExecutor
     )
     {
         var ctx = (DynamicsQueryContext)queryContext;
-        var sdkQuery = query.BuildQueryExpression();
+        var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
         IEnumerable<Entity> rows = ctx.Client
             .QueryAsync(query.EntityLogicalName, sdkQuery)
             .GetAwaiter().GetResult();
@@ -369,7 +369,7 @@ public static class DynamicsQueryExecutor
     )
     {
         var ctx = (DynamicsQueryContext)queryContext;
-        var sdkQuery = query.BuildQueryExpression();
+        var sdkQuery = query.BuildQueryExpression(queryContext.ParameterValues);
 
         IEnumerable<Entity> rows = await ctx.Client
             .QueryAsync(query.EntityLogicalName, sdkQuery, cancellationToken)

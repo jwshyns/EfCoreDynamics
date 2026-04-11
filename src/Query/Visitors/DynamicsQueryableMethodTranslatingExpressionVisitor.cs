@@ -3,7 +3,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using EfCore.Dynamics365.Metadata;
-using EfCore.Dynamics365.Query.Crm;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
@@ -73,11 +72,11 @@ internal sealed class DynamicsQueryableMethodTranslatingExpressionVisitor : Quer
     {
         // for some reason this can be null
         if (predicate is null) return source;
-        
+
         var dynQuery = (DynamicsQueryExpression)source.QueryExpression;
-        var visitor = new CrmFilterExpressionVisitor(dynQuery.EntityType, predicate.Parameters[0]);
-        var filter = visitor.Translate(predicate.Body);
-        dynQuery.AddFilter(filter);
+        // Store the raw predicate; translation (including parameter-value resolution)
+        // is deferred to BuildQueryExpression at execution time.
+        dynQuery.AddPredicate(predicate.Body, predicate.Parameters[0]);
         return source;
     }
 
